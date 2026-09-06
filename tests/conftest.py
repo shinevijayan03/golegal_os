@@ -4,11 +4,26 @@ Pytest Fixtures for GoLegal Automated Test Suite
 import pytest
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
-from domain.models import Base, User, Agreement, Party, SysConfig, SysConfigJn
-from services.stamping_service import StampingService
-from services.esign_service import ESignService
-from services.workflow_service import WorkflowService
+
+from ai.llm import NullLLMClient, reset_llm_client
+from domain.models import Agreement, Base, Party, SysConfig, User
+from security.auth import AuthService
 from security.cbac import CBACService
+from services.agreement_service import AgreementService, demo_payload
+from services.esign_service import ESignService
+from services.payment_service import PaymentService
+from services.stamping_service import StampingService
+from services.workflow_service import WorkflowService
+
+
+@pytest.fixture(autouse=True)
+def _offline_llm():
+    """Every test runs against the deterministic rule-based fallback."""
+    reset_llm_client()
+    from ai.llm import get_llm_client
+    get_llm_client(force=NullLLMClient())
+    yield
+    reset_llm_client()
 
 
 @pytest.fixture
@@ -19,7 +34,6 @@ def db_session():
     Session = sessionmaker(bind=engine)
     session = Session()
 
-    # Seed default sysconfig
     config = SysConfig(
         id="GLOBAL_CONFIG",
         lang="en",
@@ -28,7 +42,7 @@ def db_session():
         estamp_vendor="StockHolding",
         currency="INR",
         stockholding_prepaid_balance=50000.0,
-        low_balance_threshold=10000.0
+        low_balance_threshold=10000.0,
     )
     session.add(config)
     session.commit()
@@ -41,14 +55,15 @@ def db_session():
 
 @pytest.fixture
 def sample_users(db_session):
-    """Seed test users (Owner, Tenant, Witness)."""
+    """Seed test users (Owner, Tenant)."""
     owner = User(
         id="usr-owner-001",
         user_type="Single_User",
         full_name="Ramakiran Reddy",
         email="ramakiran.reddy@example.com",
         phone="9876543210",
-        address="101, Palm Meadows, Bangalore"
+        address="101, Palm Meadows, Bangalore",
+        password_hash=AuthService.hash_password("Owner@12345"),
     )
     tenant = User(
         id="usr-tenant-001",
@@ -56,7 +71,8 @@ def sample_users(db_session):
         full_name="Mayank Tripathi",
         email="mayank.tripathi@example.com",
         phone="9876543211",
-        address="Flat 202, Green Glen, Bangalore"
+        address="Flat 202, Green Glen, Bangalore",
+        password_hash=AuthService.hash_password("Tenant@12345"),
     )
     db_session.add_all([owner, tenant])
     db_session.commit()
@@ -72,59 +88,38 @@ def sample_agreement(db_session, sample_users):
         agreement_type="Rental_Residential",
         state_code="KA",
         status="Draft",
-        cloud_storage_consent=True
+        cloud_storage_consent=True,
     )
     agr.set_property_details({
         "premises_name": "Sunrise Apartments #402",
-        "address_line1": "Outer Ring Road, Bellandur",
+        "address": "Outer Ring Road, Bellandur",
         "city": "Bangalore",
         "state": "KA",
         "pincode": "560103",
-        "property_type": "Apartment"
+        "property_type": "Apartment",
     })
     agr.set_commercial_terms({
         "monthly_rent": 28000.0,
         "security_deposit": 120000.0,
-        "lease_period_months": 11,
+        "lease_months": 11,
+        "lock_in_months": 6,
+        "notice_days": 30,
         "rent_commencement_date": "2026-10-01",
-        "rent_due_day": 5
+        "rent_due_day": 5,
+        "escalation_pct": 5,
     })
     db_session.add(agr)
     db_session.commit()
 
-    owner_party = Party(
-        id="pty-owner-001",
-        agreement_id=agr.id,
-        party_type="Owner",
-        full_name="Ramakiran Reddy",
-        email="ramakiran.reddy@example.com",
-        phone="9876543210",
-        aadhaar_masked="XXXXXXXX1111",
-        signing_status="Pending"
-    )
-    tenant_party = Party(
-        id="pty-tenant-001",
-        agreement_id=agr.id,
-        party_type="Tenant",
-        full_name="Mayank Tripathi",
-        email="mayank.tripathi@example.com",
-        phone="9876543211",
-        aadhaar_masked="XXXXXXXX2222",
-        signing_status="Pending"
-    )
-    witness_party = Party(
-        id="pty-witness-001",
-        agreement_id=agr.id,
-        party_type="Witness",
-        full_name="Suresh Kumar",
-        email="suresh.kumar@example.com",
-        phone="9876543212",
-        aadhaar_masked="XXXXXXXX3333",
-        signing_status="Pending"
-    )
+    owner_party = Party(id="pty-owner-001", agreement_id=agr.id, party_type="Owner", full_name="Ramakiran Reddy",
+                        email="ramakiran.reddy@example.com", phone="9876543210", aadhaar_masked="XXXXXXXX1111", signing_status="Pending")
+    tenant_party = Party(id="pty-tenant-001", agreement_id=agr.id, party_type="Tenant", full_name="Mayank Tripathi",
+                         email="mayank.tripathi@example.com", phone="9876543211", aadhaar_masked="XXXXXXXX2222", signing_status="Pending")
+    witness_party = Party(id="pty-witness-001", agreement_id=agr.id, party_type="Witness", full_name="Suresh Kumar",
+                          email="suresh.kumar@example.com", phone="9876543212", aadhaar_masked="XXXXXXXX3333", signing_status="Pending")
     db_session.add_all([owner_party, tenant_party, witness_party])
     db_session.commit()
-
+    db_session.refresh(agr)
     return agr
 
 
@@ -144,5 +139,25 @@ def workflow_svc(db_session):
 
 
 @pytest.fixture
+def payment_svc(db_session):
+    return PaymentService(db_session)
+
+
+@pytest.fixture
+def auth_svc(db_session):
+    return AuthService(db_session)
+
+
+@pytest.fixture
+def agreement_svc(db_session):
+    return AgreementService(db_session)
+
+
+@pytest.fixture
 def cbac_svc():
     return CBACService(secret_key="test_secret_key_123")
+
+
+@pytest.fixture
+def wizard_payload():
+    return demo_payload()

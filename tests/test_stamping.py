@@ -2,7 +2,7 @@
 Tests for StockHolding (SHCIL) e-Stamping Service (TC-STAMP)
 """
 import pytest
-from services.stamping_service import StampingService, InsufficientStampingBalanceError
+from services.stamping_service import InsufficientStampingBalanceError
 from domain.models import SysConfig, SysConfigJn, AuditLog
 
 

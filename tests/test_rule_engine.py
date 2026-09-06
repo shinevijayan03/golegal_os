@@ -1,8 +1,7 @@
 """
 Tests for Statutory Rule Engine (TC-RULE)
 """
-import pytest
-from services.rule_engine import calculate_stamp_duty, get_default_clauses, MANDATORY_STATUTORY_CLAUSES
+from services.rule_engine import calculate_stamp_duty, get_default_clauses
 
 
 class TestStatutoryRuleEngine:

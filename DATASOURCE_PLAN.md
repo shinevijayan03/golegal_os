@@ -1,6 +1,6 @@
 # GoLegal Web Application - Datasource & Persistence Plan
 
-> **Document Version**: 1.0 (Master Engineering Baseline)  
+> **Version**: 2.0 (agentic baseline)  
 > **Status**: APPROVED ARCHITECTURAL SPECIFICATION  
 > **Database Engines**: SQLite 3 (Local Development & Staging) / PostgreSQL 15+ (Production Enterprise)  
 > **ORM Layer**: SQLAlchemy 2.0+ (Declarative 3NF Models with JSON support)  
@@ -348,3 +348,138 @@ To prevent transaction failures due to exhausted state stamping funds, the platf
 - **Real-Time Debit**: Upon calling the SHCIL e-Stamp issuance service, the statutory duty amount (e.g. ₹100) + platform fee is debited from `stockholding_prepaid_balance`.
 - **Low-Balance Guard**: If `stockholding_prepaid_balance < low_balance_threshold` (₹10,000), the system generates an urgent visual alert in the Admin Console and dispatches an automated alert to finance administrators.
 - **Audit Logging**: Every debit or top-up event records a full immutable entry in `sysconfigTlb$jn`.
+
+---
+
+## 6. Schema additions in v2.0 (agentic baseline)
+
+Eight tables were added to make the platform stateful, auditable and agentic. Sections 1–5 above
+remain accurate for the original nine entities.
+
+### 6.1 Why each exists
+
+| Table | Problem it solves |
+| :--- | :--- |
+| `documents` | PDFs were rebuilt on every page render, so no sealed artefact had a stable identity. Content-addressed storage makes `final_pdf_sha256` a real evidentiary reference. |
+| `otp_challenges` | Rate limiting lived in a Python dict on an object the UI recreated each rerun, so the 5-attempt lockout could never fire. |
+| `login_events` | Suspicious-ingress detection needs a history to compare against. |
+| `notifications` | Every invitation, reminder and completion notice must be provable after the fact. |
+| `feedback` | NPS was stored in session state and lost on refresh. |
+| `agent_runs` | An autonomous agent that cannot be audited is not deployable. |
+
+### 6.2 DDL (PostgreSQL)
+
+```sql
+-- 8. Content-addressed document store
+CREATE TABLE documents (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    agreement_id UUID NOT NULL REFERENCES agreements(id) ON DELETE CASCADE,
+    doc_type VARCHAR(30) NOT NULL CHECK (doc_type IN ('DRAFT','FINAL','INVOICE','CERT_65B')),
+    file_name VARCHAR(255) NOT NULL,
+    mime_type VARCHAR(100) NOT NULL DEFAULT 'application/pdf',
+    content BYTEA NOT NULL,
+    sha256 CHAR(64) NOT NULL,
+    size_bytes INTEGER NOT NULL,
+    version INTEGER NOT NULL DEFAULT 1,
+    created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
+);
+CREATE INDEX idx_documents_agreement_type ON documents(agreement_id, doc_type);
+
+-- 9. OTP challenges (login and eSign) — survives process restarts
+CREATE TABLE otp_challenges (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    subject VARCHAR(255) NOT NULL,              -- phone (LOGIN) or masked Aadhaar (ESIGN)
+    purpose VARCHAR(20) NOT NULL CHECK (purpose IN ('LOGIN','ESIGN')),
+    otp_hash VARCHAR(128) NOT NULL,             -- SHA-256(secret:otp); the OTP is never stored
+    attempts INTEGER NOT NULL DEFAULT 0,        -- carried forward across re-issued challenges
+    locked_until TIMESTAMPTZ,
+    expires_at TIMESTAMPTZ NOT NULL,
+    consumed BOOLEAN NOT NULL DEFAULT FALSE,
+    created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
+);
+CREATE INDEX idx_otp_subject_purpose ON otp_challenges(subject, purpose);
+
+-- 10. Security ingress journal
+CREATE TABLE login_events (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    user_id UUID REFERENCES users(id) ON DELETE CASCADE,
+    identifier VARCHAR(255) NOT NULL,
+    method VARCHAR(30) NOT NULL,                -- OTP | PASSWORD
+    ip_address VARCHAR(45) NOT NULL,
+    user_agent TEXT,
+    device_fingerprint VARCHAR(128),            -- SHA-256(user_agent | IP /24)
+    geo_location VARCHAR(255),
+    success BOOLEAN NOT NULL DEFAULT FALSE,
+    suspicious BOOLEAN NOT NULL DEFAULT FALSE,
+    risk_reasons JSONB NOT NULL DEFAULT '[]',
+    alert_dispatched BOOLEAN NOT NULL DEFAULT FALSE,
+    created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
+);
+CREATE INDEX idx_login_events_user ON login_events(user_id);
+
+-- 11. Notification dispatch ledger
+CREATE TABLE notifications (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    agreement_id UUID NOT NULL REFERENCES agreements(id) ON DELETE CASCADE,
+    party_id UUID REFERENCES parties(id) ON DELETE CASCADE,
+    kind VARCHAR(30) NOT NULL,                  -- INVITE | REMINDER | COMPLETION | SECURITY
+    channel VARCHAR(30) NOT NULL,               -- SMS | WHATSAPP | EMAIL | ALL
+    recipient VARCHAR(255) NOT NULL,
+    message TEXT NOT NULL,
+    signing_url TEXT,
+    status VARCHAR(20) NOT NULL DEFAULT 'SENT',
+    triggered_by VARCHAR(100) NOT NULL DEFAULT 'SYSTEM',
+    created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
+);
+CREATE INDEX idx_notifications_agreement ON notifications(agreement_id);
+
+-- 12. Net Promoter Score
+CREATE TABLE feedback (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    user_id UUID REFERENCES users(id) ON DELETE SET NULL,
+    agreement_id UUID REFERENCES agreements(id) ON DELETE SET NULL,
+    score INTEGER NOT NULL CHECK (score BETWEEN 0 AND 10),
+    category VARCHAR(100),
+    comment TEXT,
+    sentiment VARCHAR(20) NOT NULL DEFAULT 'Detractor',
+    created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
+);
+
+-- 13. AI agent execution journal
+CREATE TABLE agent_runs (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    agent_type VARCHAR(30) NOT NULL,            -- COPILOT | WORKFLOW | CLAUSE_RISK | INGEST
+    user_id UUID REFERENCES users(id) ON DELETE SET NULL,
+    agreement_id UUID REFERENCES agreements(id) ON DELETE SET NULL,
+    goal TEXT NOT NULL,
+    model VARCHAR(100) NOT NULL DEFAULT 'rule-based',
+    status VARCHAR(20) NOT NULL CHECK (status IN ('COMPLETED','FAILED','NEEDS_HUMAN','RUNNING')),
+    steps JSONB NOT NULL DEFAULT '[]',          -- [{tool, input, output, ok}]
+    outcome TEXT,
+    input_tokens INTEGER NOT NULL DEFAULT 0,
+    output_tokens INTEGER NOT NULL DEFAULT 0,
+    created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
+    completed_at TIMESTAMPTZ
+);
+CREATE INDEX idx_agent_runs_agreement ON agent_runs(agreement_id);
+```
+
+### 6.3 Columns added to existing tables
+
+| Table | Columns | Purpose |
+| :--- | :--- | :--- |
+| `users` | `state_code`, `password_hash`, `is_active`, `notification_prefs`, `last_login_at` | Real accounts, suspension, channel preferences |
+| `agreements` | `title`, `clause_toggles`, `ai_risk_report`, `final_pdf_sha256`, `is_archived`, `expires_at`, `updated_at` | Naming, clause state, cached risk, evidentiary digest, soft delete, signing window |
+| `parties` | `pan`, `address`, `last_notified_at`, `reminder_count` | Recitals and reminder cadence |
+| `payments` | `invoice_number`, `gst_amount`, `payment_mode`, `paid_by_user_id` | GST invoicing and MyInvoices scoping |
+
+`parties.access_token` widened to `VARCHAR(1024)`: a capability token is a base64url payload plus a
+64-character HMAC, which does not fit the original 255.
+
+### 6.4 Migration
+
+`persistence.database._apply_additive_migrations()` inspects the live schema on startup and issues
+`ALTER TABLE ... ADD COLUMN` for anything the models declare but the database lacks. This is
+deliberately limited to additive column changes — SQLite cannot alter constraints — so an existing
+`golegal.db` keeps working across upgrades. Constraint or type changes require a fresh database in
+development, or Alembic in production.

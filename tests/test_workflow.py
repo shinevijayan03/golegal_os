@@ -2,9 +2,8 @@
 Tests for Workflow & Asynchronous Signing State Machine (TC-WORKFLOW)
 """
 import pytest
-from services.workflow_service import WorkflowService, InvalidStateTransitionError
-from services.esign_service import ESignService
-from domain.models import Party, Agreement
+from services.workflow_service import InvalidStateTransitionError
+from domain.models import Party
 
 
 class TestWorkflowService:

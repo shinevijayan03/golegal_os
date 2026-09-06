@@ -2,8 +2,8 @@
 Tests for UIDAI / ESP Aadhaar eSign Gateway Service (TC-ESIGN)
 """
 import pytest
-from services.esign_service import ESignService, AadhaarVerificationError, RateLimitLockoutError
-from domain.models import Party, Signature, AuditLog
+from services.esign_service import AadhaarVerificationError, RateLimitLockoutError
+from domain.models import AuditLog, Party
 
 
 class TestESignService:

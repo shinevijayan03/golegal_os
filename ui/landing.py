@@ -1,108 +1,84 @@
 """
-GoLegal UI - Public Landing Page
+GoLegal UI - Public landing page
 """
+from __future__ import annotations
+
 import streamlit as st
-from services.rule_engine import calculate_stamp_duty, STATE_STAMP_RULES
+
+from ai.rent_benchmark import benchmark
+from services.agreement_service import demo_payload
+from services.rule_engine import STATE_STAMP_RULES, calculate_stamp_duty, get_default_clauses
+from ui import components as c
+from ui.state import go, reset_wizard
 
 
-def render_landing_page():
-    # Hero Section
-    st.markdown("""
-    <div style="text-align: center; padding: 2rem 1rem; background: linear-gradient(135deg, #1E3A8A 0%, #0F172A 100%); border-radius: 12px; color: white; margin-bottom: 2rem;">
-        <h1 style="color: #FFFFFF; font-size: 2.4rem; font-weight: 800; margin-bottom: 0.5rem;">
-            ⚖️ GoLegal Digital Contracting
-        </h1>
-        <p style="font-size: 1.2rem; color: #93C5FD; max-width: 750px; margin: 0 auto 1.5rem auto;">
-            Borderless, Contactless Contracting — 100% Legally Valid in Indian Courts in Under 10 Minutes.
-        </p>
-        <div style="display: flex; justify-content: center; gap: 1rem; flex-wrap: wrap;">
-            <span style="background: rgba(255,255,255,0.15); padding: 0.4rem 0.8rem; border-radius: 20px; font-size: 0.85rem; border: 1px solid rgba(255,255,255,0.2);">
-                🛡️ IT Act 2000 (§§ 4, 5, 10A)
-            </span>
-            <span style="background: rgba(255,255,255,0.15); padding: 0.4rem 0.8rem; border-radius: 20px; font-size: 0.85rem; border: 1px solid rgba(255,255,255,0.2);">
-                📜 Section 65B Evidentiary Certificate
-            </span>
-            <span style="background: rgba(255,255,255,0.15); padding: 0.4rem 0.8rem; border-radius: 20px; font-size: 0.85rem; border: 1px solid rgba(255,255,255,0.2);">
-                🏛️ StockHolding e-Stamp Partner
-            </span>
-            <span style="background: rgba(255,255,255,0.15); padding: 0.4rem 0.8rem; border-radius: 20px; font-size: 0.85rem; border: 1px solid rgba(255,255,255,0.2);">
-                🔑 UIDAI Aadhaar eSign
-            </span>
-        </div>
-    </div>
-    """, unsafe_allow_html=True)
+def render_landing_page(user=None) -> None:
+    c.eyebrow("Rental agreements · e-Stamp · Aadhaar eSign")
+    c.display("A stamped, signed rental deed.<br/><em>Ten minutes.</em> No broker, no queue.",
+              "Draft on lawyer-vetted clauses, pay stamp duty online, and let everyone sign from their phone. "
+              "Valid in Indian courts under the IT Act 2000, with a Section 65B certificate attached.")
+    col_a, col_b, col_c = st.columns([1.2, 1.2, 3])
+    with col_a:
+        if st.button("Create agreement", type="primary", use_container_width=True):
+            go("Create agreement")
+    with col_b:
+        if st.button("Try the demo deed", use_container_width=True):
+            reset_wizard(demo_payload(), step=3)
+            go("Create agreement")
+    st.write("")
+    c.trust_strip()
+    st.write("")
 
-    col1, col2 = st.columns([1, 1], gap="large")
+    left, right = st.columns([1.15, 1], gap="large")
+    with left:
+        st.markdown("#### How it works")
+        c.how_it_works()
+        st.write("")
+        st.markdown("#### Why people switch")
+        r1, r2 = st.columns(2)
+        with r1:
+            c.card("Under 10 minutes, end to end", "Traditional execution takes 3 to 14 days across drafting, courier, stamp vendor and wet signatures.")
+            st.write("")
+            c.card("Parties anywhere in India", "Landlord in Delhi, tenant in Bangalore, witness in Mumbai. Tokenized links, Aadhaar OTP, any order.")
+        with r2:
+            c.card("Half the cost, no markups", "Flat platform fee plus the actual state duty. No broker margin, no notary run-around.")
+            st.write("")
+            c.card("Evidence that holds up", "Every sealed deed carries signer IPs, timestamps, PKCS#7 hashes and a SHA-256 digest on its Section 65B page.")
 
-    with col1:
-        st.subheader("🚀 3-Click Frictionless Execution")
-        st.markdown("""
-        1. **1. Choose & Customize**: Select state jurisdiction (e.g. Karnataka ₹100 e-Stamp) and fill structured landlord, tenant, and property details.
-        2. **2. Instant e-Stamping**: Automated integration with StockHolding Corporation of India (SHCIL) generates genuine government stamp certificates.
-        3. **3. Multi-Party Aadhaar eSign**: Counterparties sign asynchronously via secure OTP links sent to WhatsApp and Email. Instant tamper-proof sealed PDF download.
-        """)
-
-        st.info("💡 **HRA & Address Proof Ready**: Downloaded contracts include an automated Section 65B Electronic Evidentiary Certificate accepted by corporates and authorities.")
-
-        if st.button("📝 Start Rental Agreement Now", type="primary", use_container_width=True):
-            st.session_state["active_tab"] = "Create Agreement"
-            st.rerun()
-
-    with col2:
-        st.subheader("🧮 Dynamic Stamp Duty Estimator")
+    with right:
+        st.markdown("#### What will it cost?")
         with st.container(border=True):
             state_options = {k: v["name"] for k, v in STATE_STAMP_RULES.items()}
-            selected_state = st.selectbox(
-                "Select Property State / Jurisdiction:",
-                options=list(state_options.keys()),
-                format_func=lambda x: f"{state_options[x]} ({x})"
-            )
+            state = st.selectbox("Property state", options=list(state_options), format_func=lambda x: f"{state_options[x]} ({x})", key="lp_state")
+            rent = st.number_input("Monthly rent (₹)", min_value=1000, max_value=1_000_000, value=25000, step=1000, key="lp_rent")
+            deposit = st.number_input("Security deposit (₹)", min_value=0, max_value=5_000_000, value=100000, step=5000, key="lp_dep")
+            q = calculate_stamp_duty(state, rent, deposit, months=11)
+            m1, m2 = st.columns(2)
+            with m1:
+                c.stat("State stamp duty", c.money(q["stamp_duty_amount"]), q["article"])
+            with m2:
+                c.stat("Total payable", c.money(q["total_payable"]), f"incl. ₹{q['platform_fee']:.0f} fee + 18% GST", tone="ok")
+            city = {"KA": "Bangalore", "DL": "Delhi", "MH": "Mumbai", "TN": "Chennai", "TS": "Hyderabad", "HR": "Gurgaon"}.get(state)
+            if city:
+                b = benchmark(city, "", "2BHK", rent, deposit)
+                if b.get("supported") and b.get("insights"):
+                    c.notice("<b>Market check.</b> " + c.esc(b["insights"][0]), "info")
+        st.write("")
+        st.markdown("#### What the deed contains")
+        with st.container(border=True):
+            for cl in get_default_clauses()[:6]:
+                lock = "🔒 " if not cl["derogable"] else ""
+                st.markdown(f"**{lock}{cl['title']}** — <span style='color:#64748B;font-size:.85rem'>{cl['text'][:110]}…</span>", unsafe_allow_html=True)
+            st.caption("🔒 statutory clauses cannot be edited; every other covenant is yours to customise.")
 
-            rent = st.number_input("Monthly Rent (INR):", min_value=1000, max_value=1000000, value=25000, step=1000)
-            deposit = st.number_input("Refundable Security Deposit (INR):", min_value=0, max_value=5000000, value=100000, step=5000)
-
-            duty_calc = calculate_stamp_duty(selected_state, rent, deposit, months=11)
-
-            st.divider()
-            c_a, c_b = st.columns(2)
-            c_a.metric("Statutory Stamp Duty", f"₹ {duty_calc['stamp_duty_amount']:.2f}")
-            c_b.metric("GoLegal Platform Fee", f"₹ {duty_calc['platform_fee']:.2f}")
-            
-            st.markdown(f"""
-            - **GST (18%)**: ₹ {duty_calc['gst_amount']:.2f}
-            - **Total Estimated Cost**: <span style="color:#059669; font-weight:bold; font-size:1.1rem;">₹ {duty_calc['total_payable']:.2f}</span>
-            """, unsafe_allow_html=True)
-
-    st.divider()
-
-    # Value Pillars
-    st.subheader("💎 Why Choose GoLegal?")
-    vp1, vp2, vp3, vp4 = st.columns(4)
-    with vp1:
-        st.markdown("""
-        <div style="background:#F8FAFC; padding:1rem; border-radius:8px; border:1px solid #E2E8F0; text-align:center;">
-            <h4>⚡ Under 10 Mins</h4>
-            <p style="font-size:0.85rem; color:#475569;">Eliminate 14-day broker and sub-registrar delays with instant digital processing.</p>
-        </div>
-        """, unsafe_allow_html=True)
-    with vp2:
-        st.markdown("""
-        <div style="background:#F8FAFC; padding:1rem; border-radius:8px; border:1px solid #E2E8F0; text-align:center;">
-            <h4>💰 50%+ Savings</h4>
-            <p style="font-size:0.85rem; color:#475569;">No arbitrary broker stamp markups or hidden notary charges. Transparent flat pricing.</p>
-        </div>
-        """, unsafe_allow_html=True)
-    with vp3:
-        st.markdown("""
-        <div style="background:#F8FAFC; padding:1rem; border-radius:8px; border:1px solid #E2E8F0; text-align:center;">
-            <h4>📱 Remote Signing</h4>
-            <p style="font-size:0.85rem; color:#475569;">Landlord in Delhi, Tenant in Bangalore, Witnesses in Mumbai. Sign asynchronously anywhere.</p>
-        </div>
-        """, unsafe_allow_html=True)
-    with vp4:
-        st.markdown("""
-        <div style="background:#F8FAFC; padding:1rem; border-radius:8px; border:1px solid #E2E8F0; text-align:center;">
-            <h4>🔒 Zero Hoarding</h4>
-            <p style="font-size:0.85rem; color:#475569;">Aadhaar masked as XXXXXXXX1234. Consent-based storage with 27-day automated draft purge.</p>
-        </div>
-        """, unsafe_allow_html=True)
+    st.write("")
+    st.markdown("#### Questions people ask")
+    faq = [
+        ("Is an e-signed rental agreement valid in court?", "Yes. Sections 4, 5 and 10A of the IT Act 2000 recognise electronic records and Aadhaar-based electronic signatures. GoLegal appends a Section 65B certificate so the deed is admissible as evidence."),
+        ("Do we still need to register it?", "11-month residential agreements only need stamp duty, which GoLegal pays through StockHolding. Leases of 12 months or more must additionally be registered with the Sub-Registrar."),
+        ("What if my landlord is not tech-savvy?", "They receive a WhatsApp/SMS link, tap it, read the deed in plain language (Hindi and Kannada summaries are available) and enter the OTP sent to their Aadhaar-linked mobile. Nothing to install."),
+        ("What happens to my Aadhaar number?", "It is used once for OTP verification and immediately masked to XXXXXXXX1234. GoLegal never stores the full number."),
+    ]
+    for q_, a_ in faq:
+        with st.expander(q_):
+            st.write(a_)

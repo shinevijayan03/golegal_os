@@ -1,6 +1,6 @@
 # GoLegal Web Application - Deployment Plan
 
-> **Document Version**: 1.0 (Master Engineering Baseline)  
+> **Version**: 2.0 (agentic baseline)  
 > **Status**: APPROVED INFRASTRUCTURE & DEPLOYMENT SPECIFICATION  
 > **Hosting Strategy**: Local Staging (Streamlit Runtime) $\rightarrow$ Docker Container $\rightarrow$ India Cloud VPC (AWS / DigitalOcean)  
 > **Sovereignty Requirement**: 100% Data Localization within Indian Territorial Boundaries (MeitY / RBI Compliance)  
@@ -10,7 +10,7 @@
 ## 1. Local Staging Setup & Execution
 
 ### 1.1 Prerequisites & Python Environment
-- Python 3.10 or higher
+- Python 3.12 or higher
 - `pip` package manager and `virtualenv`
 
 ### 1.2 Execution Commands
@@ -40,7 +40,7 @@ The application will be accessible locally at `http://localhost:8501`.
 ### 2.1 Multi-Stage Dockerfile (`Dockerfile`)
 ```dockerfile
 # Stage 1: Build & Dependency Resolution
-FROM python:3.11-slim AS builder
+FROM python:3.12-slim AS builder
 
 WORKDIR /app
 RUN apt-get update && apt-get install -y --no-install-recommends \
@@ -52,7 +52,7 @@ COPY requirements.txt .
 RUN pip install --no-cache-dir --user -r requirements.txt
 
 # Stage 2: Final Minimal Runtime Image
-FROM python:3.11-slim AS runner
+FROM python:3.12-slim AS runner
 
 WORKDIR /app
 # Install minimal runtime libraries for ReportLab PDF rendering
@@ -99,39 +99,96 @@ tests/
 
 ---
 
-## 3. Environment Variables Configuration (`.env.example`)
+## 3. Environment configuration
+
+Every one of these is read by `config.py`. Nothing security-sensitive is hardcoded anywhere else in
+the codebase, and the two secrets below **must** be rotated before any deployment — the defaults are
+labelled dev placeholders precisely so that shipping them is visible in a diff.
 
 ```ini
-# Platform Environment & Secret Keys
-ENV=production
-SECRET_KEY=golegal_crypto_secure_hmac_secret_2026_change_in_prod
-PORT=8501
+# ---- Runtime -------------------------------------------------------------
+GOLEGAL_ENV=production
+GOLEGAL_BASE_URL=https://app.golegal.in       # used to mint signing links
+DATABASE_URL=postgresql://golegal:CHANGE_ME@db.internal:5432/golegal_prod
 
-# Database Persistence Configuration
-# Development SQLite:
-DATABASE_URL=sqlite:///./golegal.db
-# Production PostgreSQL (India VPC):
-# DATABASE_URL=postgresql://golegal_user:StrongPass123@db.internal:5432/golegal_prod
+# ---- Secrets (ROTATE) ----------------------------------------------------
+GOLEGAL_CBAC_SECRET=<64+ random chars>        # signs every capability token
+GOLEGAL_DSC_SECRET=<64+ random chars>         # corporate seal HMAC
+GOLEGAL_PBKDF2_ITERATIONS=120000
 
-# Mock vs Live Trust Service Toggles
-MOCK_SHCIL_ENABLED=true
-SHCIL_API_URL=https://api.stockholding.mock.internal/v1/estamp
-SHCIL_CLIENT_ID=golegal_corp_in
-SHCIL_INITIAL_PREPAID_BALANCE=50000.00
-LOW_BALANCE_THRESHOLD=10000.00
+# ---- Auth & signing windows ---------------------------------------------
+GOLEGAL_SIGNING_LINK_TTL_DAYS=7
+GOLEGAL_OTP_TTL_SECONDS=300
+GOLEGAL_OTP_MAX_ATTEMPTS=5
+GOLEGAL_OTP_LOCKOUT_SECONDS=900
 
-MOCK_UIDAI_ENABLED=true
-UIDAI_ESP_GATEWAY_URL=https://esign.esp.mock.internal/v2/otp
+# ---- Gateways ------------------------------------------------------------
+GOLEGAL_MOCK_GATEWAYS=false                   # false = live SHCIL / UIDAI / payments
+                                              # also stops OTPs being echoed to the screen
 
-# Payment Gateway Configuration
-PAYMENT_GATEWAY_PROVIDER=Razorpay
-PAYMENT_KEY_ID=rzp_live_golegal_mock_key
-PAYMENT_KEY_SECRET=rzp_live_secret_mock
+# ---- Pricing (server-side, never client-supplied) ------------------------
+GOLEGAL_PLATFORM_FEE=299.0
+GOLEGAL_GST_RATE=0.18
+GOLEGAL_LOW_BALANCE_THRESHOLD=10000.0
+GOLEGAL_INITIAL_PREPAID_BALANCE=50000.0
 
-# Section 65B & Evidentiary Retention
-STORAGE_RETENTION_PURGE_DAYS=27
-DATA_LOCALIZATION_REGION=ap-south-1
+# ---- Retention -----------------------------------------------------------
+GOLEGAL_DRAFT_PRUNING_DAYS=27
+GOLEGAL_AGREEMENT_RETAIN_DAYS=2920            # 8 years
+
+# ---- AI layer (optional) -------------------------------------------------
+ANTHROPIC_API_KEY=sk-ant-...                  # unset = deterministic fallback
+GOLEGAL_LLM_MODEL=claude-opus-5
+GOLEGAL_LLM_EFFORT=medium                     # low | medium | high | xhigh | max
+GOLEGAL_LLM_MAX_TOKENS=4096
+GOLEGAL_LLM_ENABLED=true
+GOLEGAL_AGENT_MAX_TOOL_CALLS=12
+
+# ---- Statutory identity --------------------------------------------------
+GOLEGAL_GSTIN=29AAACA0000A1Z5
 ```
+
+> **`GOLEGAL_MOCK_GATEWAYS=false` is a security control, not just a feature flag.** In sandbox mode
+> the application displays OTPs on screen so the flow can be demonstrated. In production this must be
+> off.
+
+### 3.1 Pre-deployment checklist
+
+- [ ] `GOLEGAL_CBAC_SECRET` and `GOLEGAL_DSC_SECRET` rotated to high-entropy values held in a secrets manager
+- [ ] `GOLEGAL_MOCK_GATEWAYS=false`
+- [ ] `DATABASE_URL` points at PostgreSQL, not SQLite
+- [ ] `GOLEGAL_BASE_URL` is the public HTTPS origin (signing links are minted from it)
+- [ ] Demo account seeding disabled — call `init_db(seed_demo=False)` or remove the demo accounts post-migration
+- [ ] Object storage configured if documents are moved out of the `documents` table
+
+---
+
+## 3A. Agent sweep worker
+
+The autonomous workflow agent must run as a scheduled job, and as **exactly one** instance — two
+workers sweeping concurrently would double-dispatch reminders.
+
+```python
+# sweep.py — invoked by cron / ECS scheduled task / Kubernetes CronJob
+from ai.workflow_agent import WorkflowAgent
+from persistence.database import SessionLocal
+
+session = SessionLocal()
+try:
+    summary = WorkflowAgent(session).sweep(triggered_by="CRON")
+    print(summary)          # goes to structured logs
+finally:
+    session.close()
+```
+
+```
+# hourly is sufficient: reminders are rate-limited to one per party per 20 hours,
+# and the signing window has day granularity
+0 * * * *  cd /app && python sweep.py
+```
+
+Every sweep writes an `AgentRun` per agreement visited, so the job is auditable after the fact and
+idempotent if it runs twice.
 
 ---
 

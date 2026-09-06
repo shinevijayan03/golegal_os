@@ -3,8 +3,8 @@ Tests for Security, Capability-Based Access Control (CBAC), and OWASP Matrix (TC
 """
 import pytest
 import time
-from security.cbac import CBACService, UnauthorizedCapabilityError, TokenExpiredError
-from domain.models import Agreement, Party
+from security.cbac import TokenExpiredError, UnauthorizedCapabilityError
+from domain.models import Agreement
 
 
 class TestSecurityAndOWASP:

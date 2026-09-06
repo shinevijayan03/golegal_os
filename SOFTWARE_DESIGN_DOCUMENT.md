@@ -1,229 +1,307 @@
-# GoLegal Web Application - Software Design Document (LLD)
+# GoLegal — Software Design Document (low-level design)
 
-> **Document Version**: 1.0 (Master Engineering Baseline)  
-> **Status**: APPROVED LOW-LEVEL DESIGN SPECIFICATION  
-> **Target Language**: Python 3.10+ (Type Hinted & PEP 8 Compliant)  
-> **Cryptographic Standards**: SHA-256 Digest, PKCS#7 X.509 Container Simulation, HMAC-SHA256 CBAC  
+> **Version**: 2.0 (agentic baseline)
+> **Language**: Python 3.12, type-hinted, PEP 8
+> **Cryptography**: SHA-256 digests, HMAC-SHA256 for capability tokens and the corporate seal, PBKDF2-HMAC-SHA256 for passwords
 
 ---
 
-## 1. Domain Class Hierarchies & Data Models
+## 1. Module map
 
-The system employs typed domain models mapped via SQLAlchemy ORM, enforcing strict business invariants, data sanitization, and PII masking.
+```
+config.py                    every secret, fee, threshold and model setting, from the environment
+domain/models.py             17 ORM entities, 3NF, with JSON accessors
+persistence/database.py      engine, session factory, additive migrations, demo seeding
+security/
+  cbac.py                    capability tokens, role→action mapping, XSS sanitisation, purge rule
+  auth.py                    passwords, OTP challenges, suspicious-ingress detection
+services/
+  validation.py              PAN/PIN/email/phone/Aadhaar, party and payload validation
+  rule_engine.py             state stamp duty, statutory + optional clause library
+  agreement_service.py       draft CRUD, party sync, ownership scoping, archive
+  payment_service.py         server-side quote, capture, GST invoice
+  stamping_service.py        SHCIL procurement, prepaid ledger, low-balance guard
+  esign_service.py           Aadhaar OTP challenge, verification, signature rows
+  notification.py            tokenized links, invitations, reminders, completion notices
+  document_service.py        content-addressed PDF store with digest verification
+  doc_assembly.py            ReportLab: e-Stamp page 1, Page X of Y, § 65B, GST invoice
+  workflow_service.py        state machine, dispatch, sealing, expiry, purge, reminder sweep
+ai/
+  llm.py                     provider gateway + offline null client + JSON extraction
+  tools.py                   tool registry with read/write/human tiers and call journaling
+  copilot.py                 tool-use loop with a deterministic rule router fallback
+  workflow_agent.py          observe → plan → act → journal, portfolio sweep
+  clause_intelligence.py     risk scoring, PII redaction, plain-language & vernacular summaries
+  contract_ingest.py         existing contract / natural-language brief → wizard payload
+  rent_benchmark.py          fair-rent bands and deposit norms per micro-market
+ui/                          theme, components, state, and one module per screen
+```
+
+---
+
+## 2. Domain model
 
 ```mermaid
 classDiagram
     class User {
-        +UUID id
+        +str id
         +str user_type
-        +str full_name
         +str email
         +str phone
-        +str address
-        +datetime created_at
-        +datetime updated_at
-        +validate_email() bool
-        +mask_phone() str
+        +str password_hash
+        +bool is_active
+        +is_admin() bool
+        +get_notification_prefs() dict
     }
-
     class Agreement {
-        +UUID id
-        +UUID initiator_id
-        +str agreement_type
-        +str state_code
+        +str id
+        +str initiator_id
         +str status
-        +dict property_details
-        +dict commercial_terms
-        +str custom_clauses
-        +str final_pdf_url
+        +json property_details
+        +json commercial_terms
+        +json clause_toggles
+        +json ai_risk_report
+        +str final_pdf_sha256
         +bool cloud_storage_consent
-        +datetime created_at
-        +datetime executed_at
-        +can_transition_to(new_status) bool
-        +are_all_signatures_collected() bool
-        +calculate_stamp_duty() float
+        +bool is_archived
+        +datetime expires_at
+        +display_title() str
+        +signed_count() int
     }
-
     class Party {
-        +UUID id
-        +UUID agreement_id
         +str party_type
-        +str full_name
-        +str email
-        +str phone
         +str aadhaar_masked
         +str signing_status
         +str access_token
-        +datetime access_token_expires_at
-        +generate_cbac_token() str
-        +verify_cbac_token(token) bool
-        +set_aadhaar_masked(raw_aadhaar) void
+        +int reminder_count
+        +datetime last_notified_at
     }
-
-    class EStamp {
-        +UUID id
-        +UUID agreement_id
-        +str certificate_number
-        +str state_code
-        +float stamp_amount
-        +str purchased_by
-        +str vendor
-        +datetime issued_at
-        +str certificate_url
-        +verify_certificate_integrity() bool
+    class Document {
+        +str doc_type
+        +bytes content
+        +str sha256
+        +int version
     }
-
-    class Signature {
-        +UUID id
-        +UUID agreement_id
-        +UUID party_id
-        +str auth_type
-        +str transaction_ref
-        +str cert_issuer
-        +str signature_hash
-        +datetime signed_at
-        +str ip_address
-        +str user_agent
-        +verify_pkcs7_hash() bool
-    }
-
-    class Payment {
-        +UUID id
-        +UUID agreement_id
-        +float total_amount
-        +float stamp_duty_amount
-        +float platform_fee
-        +str payment_gateway
-        +str gateway_payment_id
+    class AgentRun {
+        +str agent_type
+        +str goal
+        +str model
         +str status
-        +str invoice_pdf_url
-        +generate_gst_invoice() str
+        +json steps
+        +int input_tokens
+        +int output_tokens
     }
-
-    class AuditLog {
-        +UUID id
-        +UUID agreement_id
-        +str event_type
-        +str triggered_by
-        +dict event_data
-        +datetime recorded_at
-        +to_section65b_row() dict
+    class LoginEvent {
+        +str ip_address
+        +str device_fingerprint
+        +bool suspicious
+        +json risk_reasons
     }
-
-    class SysConfig {
-        +str id
-        +str lang
-        +str dig_sign
-        +bool estamp
-        +str estamp_vendor
-        +float stockholding_prepaid_balance
-        +float low_balance_threshold
-        +debit_stamping_balance(amount) bool
-        +is_low_balance() bool
+    class Notification {
+        +str kind
+        +str channel
+        +str signing_url
+    }
+    class OtpChallenge {
+        +str subject
+        +str purpose
+        +str otp_hash
+        +int attempts
+        +datetime locked_until
     }
 
     User "1" --> "0..*" Agreement : initiates
-    Agreement "1" --> "1..*" Party : involves
-    Agreement "1" --> "0..1" EStamp : secures
-    Agreement "1" --> "0..*" Signature : contains
-    Agreement "1" --> "0..1" Payment : settles
-    Agreement "1" --> "0..*" AuditLog : journals
-    Party "1" --> "0..*" Signature : signs
+    User "1" --> "0..*" LoginEvent : journals
+    Agreement "1" --> "1..*" Party
+    Agreement "1" --> "0..1" EStamp
+    Agreement "1" --> "0..*" Signature
+    Agreement "1" --> "0..1" Payment
+    Agreement "1" --> "0..*" AuditLog
+    Agreement "1" --> "0..*" Document
+    Agreement "1" --> "0..*" Notification
+    Agreement "1" --> "0..*" AgentRun
+    Party "1" --> "0..*" Signature
 ```
+
+**Design notes.**
+
+- Aadhaar exists in exactly one column, `parties.aadhaar_masked`, and only ever in `XXXXXXXX1234`
+  form. `mask_aadhaar()` is the single entry point; it is idempotent so a re-loaded payload does not
+  double-mask or raise.
+- `documents` stores bytes plus a SHA-256. A sealed deed is generated **once**; re-sealing returns the
+  stored bytes, which is what makes `final_pdf_sha256` a stable evidentiary reference.
+- `agent_runs` is append-only in practice: rows are inserted at start, updated once at completion.
 
 ---
 
-## 2. Asynchronous Non-Atomic Signing State Machine
+## 3. Capability-based access control
 
-Agreements involve multiple independent counterparties (`1..n` owners, `1..n` tenants, `1..2` witnesses) who execute their signatures at arbitrary times without requiring synchronous co-presence.
-
-```mermaid
-stateDiagram-v2
-    [*] --> Draft : Initiator creates agreement
-    Draft --> Draft : Update metadata & clauses
-    Draft --> Paid : Payment Captured & e-Stamp Purchased
-    Paid --> Pending_Signatures : Initiator signs via Aadhaar OTP
-    
-    state Pending_Signatures {
-        [*] --> EvaluatingPending
-        EvaluatingPending --> WaitingCounterparty : Sign link dispatched
-        WaitingCounterparty --> RecordingPartySign : Aadhaar OTP verified
-        RecordingPartySign --> EvaluatingPending : Record in signatures table
-        EvaluatingPending --> AllPartiesSigned : Count(Signatures) == Count(Required)
-    }
-
-    Pending_Signatures --> Completed : Apply GoLegal Corporate DSC & Lock PDF
-    Pending_Signatures --> Expired : Expiration window breached (> 7 days)
-    Draft --> Cancelled : User abandons draft
-    Pending_Signatures --> Cancelled : Initiator revokes contract
-    Completed --> [*]
-    Expired --> [*]
-    Cancelled --> [*]
+```
+token = base64url(payload) "." HMAC-SHA256(payload, secret)
+payload = { agr_id, pty_id, role, actions[], exp }
 ```
 
-### 2.1 Concurrency & Idempotency Rules
-1. **Idempotent Signing Endpoint**: When a signatory submits their Aadhaar OTP, the signature transaction is wrapped in a database row-level lock on the `parties` record. If `party.signing_status == 'Signed'`, subsequent requests are rejected as duplicates.
-2. **Order Independence**: Signatories may execute in any arbitrary sequence (e.g. Tenant $\rightarrow$ Witness 1 $\rightarrow$ Landlord $\rightarrow$ Witness 2).
-3. **Atomic Sealing Trigger**: The completion hook checks:
-   $$\text{Remaining} = \sum_{\text{parties}} \mathbf{1}_{(\text{signing\_status} \neq \text{'Signed'})}$$
-   When $\text{Remaining} = 0$, the system atomically transitions `agreements.status` to `'Completed'` and invokes the cryptographic sealing engine.
+`verify_token(token, required_agreement_id, required_action)` enforces, in order: format, signature,
+expiry, **agreement match** (IDOR), action membership, and the witness rule.
+
+| Role | Before signing | After sealing |
+| :--- | :--- | :--- |
+| Owner | VIEW_DRAFT, EXECUTE_ESIGN, DOWNLOAD_FINAL | same, TTL extended to the retention period |
+| Tenant | VIEW_DRAFT, EXECUTE_ESIGN, DOWNLOAD_FINAL | same |
+| Witness | VIEW_DRAFT, EXECUTE_ESIGN | **COMPLETED_ACK only** |
+
+The witness downgrade happens in `seal_agreement()`, which re-mints every party token. The signing
+page detects the downgraded capability and renders the policy explanation rather than an error.
 
 ---
 
-## 3. Capability-Based Access Control (CBAC) Token Specification
+## 4. Asynchronous multi-party signing
 
-To eliminate Insecure Direct Object References (IDOR), agreement resources cannot be accessed using naked UUIDs alone. Access is mediated by cryptographically signed capability tokens.
+Order independence is a property of the data model, not of the code path: a signature is a row keyed
+by `(agreement_id, party_id)`, and completion is evaluated as a set predicate.
 
-### 3.1 Token Format & Signature Construction
-$$\text{CBAC\_Token} = \text{base64url}(\text{Payload}) \,\|\, \text{"."} \,\|\, \text{HMAC-SHA256}(\text{Payload}, \text{SecretKey})$$
+$$\text{Remaining} = \sum_{p \in \text{parties}} \mathbf{1}_{(p.\text{signing\_status} \neq \text{Signed})}$$
 
-Where `Payload` contains:
-```json
-{
-  "agr_id": "8f3b2029-...",
-  "pty_id": "c1a9420b-...",
-  "role": "Tenant",
-  "actions": ["VIEW_DRAFT", "EXECUTE_ESIGN"],
-  "exp": 1799283600
-}
-```
+`check_and_complete_signing()` seals when Remaining = 0. Idempotency:
 
-### 3.2 Granular Action Privileges & Witness Privacy Rule
-- **VIEW_DRAFT**: Permitted for Owners, Tenants, and invited signers before completion.
-- **EXECUTE_ESIGN**: Grants access to the UIDAI OTP verification modal.
-- **DOWNLOAD_FINAL**: Granted permanently to Owners and Tenants.
-- **Witness Privacy Policy**: Once a witness executes their signature, their token capability is downgraded to `COMPLETED_ACK`. Witnesses **cannot** view or download the ongoing contract or party financial records post-execution.
+- **Signing** — if the party is already `Signed`, the existing `Signature` row is returned; the OTP challenge is still consumed so a replayed OTP cannot be reused.
+- **Stamping** — `procure_estamp` returns the existing certificate without a second debit.
+- **Payment** — `checkout` returns the existing successful payment.
+- **Sealing** — returns the stored bytes when the digest already matches.
+
+Each of these has a test asserting no double side effect.
 
 ---
 
-## 4. Cryptographic Sealing & Section 65B Evidentiary Certificate
+## 5. OTP and rate limiting
+
+Both login and eSign OTP flows use `otp_challenges`:
+
+| Field | Purpose |
+| :--- | :--- |
+| `subject` | phone (LOGIN) or masked Aadhaar (ESIGN) |
+| `otp_hash` | SHA-256 of `secret:otp` — the OTP itself is never stored |
+| `attempts` | incremented on failure; **carried forward** when a new OTP is issued |
+| `locked_until` | set on the 5th failure, 15 minutes |
+| `expires_at` | 5 minutes |
+| `consumed` | single use |
+
+Carrying `attempts` across a re-issued OTP is the detail that makes the lockout real: without it, a
+caller could reset the counter by requesting a fresh code.
+
+---
+
+## 6. Suspicious-ingress detection
 
 ```mermaid
 flowchart TD
-    RawDoc["Assembled PDF Agreement<br/>(e-Stamp + Clauses + Signatures)"] --> HashCalc["SHA-256 Document Digest Computation"]
-    HashCalc --> Digest["Document SHA-256 Digest: 64-char Hex"]
-    Digest --> X509["Simulate PKCS#7 X.509 Container<br/>(Signatures of Owner, Tenant, Witnesses)"]
-    X509 --> DSCSeal["Apply GoLegal Corporate Certifying Seal (DSC)"]
-    DSCSeal --> SealedPDF["Final Tamper-Proof Certified PDF Document"]
-    
-    SealedPDF --> Cert65B["Automated Section 65B Certificate Generation"]
-    Cert65B --> AuditMeta["Preserve Timestamps, Signer IPs, CA Hashes"]
-    AuditMeta --> FinalArchive["AES-256 Storage & Multi-Party Delivery"]
+    L["Sign-in attempt"] --> C{"Credentials valid?"}
+    C -->|No| J1["Journal failure · no session"]
+    C -->|Yes| H["Read last 50 successful sign-ins"]
+    H --> F{"First ever sign-in?"}
+    F -->|Yes| B["Establish baseline · not suspicious"]
+    F -->|No| M["Compare device fingerprint, IP /24, geo"]
+    M -->|All known| OK["Journal normal"]
+    M -->|Any unknown| A["Journal suspicious + reasons<br/>dispatch email alert<br/>banner on next render"]
 ```
 
-### 4.1 Section 65B Certificate Content Model
-The appended evidentiary certificate contains:
-1. **System Server Identifier**: Hostname, server clock calibration, and timezone (IST/UTC).
-2. **Device & Network Ingress Audit**: IP address, user-agent, and geolocation metadata for each signing actor.
-3. **Cryptographic Checksums**: Pre-execution draft SHA-256 digest, individual PKCS#7 signature hashes, and post-sealing final SHA-256 digest.
-4. **Statutory Declaration**: Standardized legal certification under Section 65B(4) of the Indian Evidence Act, 1872, signed by the GoLegal System Custodian.
+The fingerprint is derived from user agent + IP subnet, so the same browser on the same network is
+recognised across sessions. A random per-session id would alert on every visit, which trains users to
+ignore the alert.
 
 ---
 
-## 5. Document Assembly & Pagination Engine
+## 7. Agent tool contract
 
-1. **Page 1 (Statutory e-Stamp Header)**: Incorporates the official StockHolding Corporation of India Limited (SHCIL) e-Stamp certificate graphic, state seal, unique certificate number (`IN-KA...`), purchaser name, and duty consideration amount.
-2. **Pages 2 to N (Agreement Body)**: Dynamically renders legal clauses, parties' identities, property schedule, and commercial terms using ReportLab flowables.
-3. **Continuous Numbering**: Enforces strict two-pass canvas numbering:
-   $$\text{"Page "} + str(current\_page) + \text{" of "} + str(total\_pages)$$
-4. **Execution Block**: Renders the Section 65B signature table and corporate DSC seal at the terminal page of the deed.
+```python
+@dataclass
+class ToolSpec:
+    name: str
+    description: str        # what the model reads
+    input_schema: dict      # JSON Schema; validated by the API
+    tier: str               # "read" | "write" | "human"
+    handler: Callable | None
+```
+
+| Tier | Meaning | Enforcement |
+| :--- | :--- | :--- |
+| `read` | Pure lookup | Always permitted |
+| `write` | Mutates the draft or dispatches messages | Refused when `ToolContext.mode == "readonly"` |
+| `human` | A personal legal act | `handler is None`; execution raises `ToolPermissionError`, and the tool is omitted from the definitions sent to the model |
+
+Registered tools:
+
+| Tool | Tier |
+| :--- | :--- |
+| `calculate_stamp_duty`, `list_supported_states`, `get_rent_benchmark` | read |
+| `assess_clause_risk`, `explain_legal_term`, `summarize_agreement`, `redact_pii` | read |
+| `get_draft_status`, `list_my_agreements`, `get_signing_progress` | read |
+| `extract_terms_from_text`, `prefill_agreement`, `save_draft`, `send_signing_reminders` | write |
+| `pay_and_procure_estamp`, `aadhaar_esign` | **human** |
+
+Every call is recorded as `{tool, input, output, ok}` and persisted on the `AgentRun`, so a run can be
+replayed and audited after the fact.
+
+---
+
+## 8. Copilot execution
+
+```mermaid
+flowchart TD
+    Msg["User message"] --> Run["Insert AgentRun (RUNNING)"]
+    Run --> Has{"Model configured?"}
+    Has -->|Yes| Loop["Tool-use loop"]
+    Has -->|No| Rules["Rule router"]
+
+    Loop --> Call["messages.create(system, history, tools)"]
+    Call --> Stop{"stop_reason"}
+    Stop -->|refusal| Ref["Return a scoped decline"]
+    Stop -->|end_turn| Done["Return text"]
+    Stop -->|tool_use| Exec["Execute each tool via the registry"]
+    Exec --> Append["Append assistant blocks + tool_result blocks"]
+    Append --> Call
+    Loop -.->|LLMUnavailableError| Rules
+
+    Rules --> Match["Intent match → the same tools"]
+    Match --> Done
+    Done --> Persist["Update AgentRun: steps, outcome, tokens"]
+```
+
+The rule router is not a toy: it calls the identical tool registry, so an offline answer about stamp
+duty comes from `calculate_stamp_duty`, not from a hardcoded string. Intent precedence matters and is
+tested — "what is an e-stamp?" is a definition, "what does an e-stamp cost?" is a price, and "explain
+this agreement in Hindi" is a summary.
+
+---
+
+## 9. Clause risk scoring
+
+Two independent passes, merged:
+
+1. **Parameter rules** over the commercial terms — deposit-to-rent ratio against state norms, lock-in versus term, notice period, escalation, and a registration warning at ≥ 12 months.
+2. **Pattern rules** over free text — deposit forfeiture, entry without notice, eviction without notice, punitive penalties, unilateral variation, blanket liability waivers, discriminatory restrictions, references to verbal side agreements.
+
+Score = Σ severity weights (high 30, medium 12, low 5, info 0), capped at 100; level is high ≥ 40,
+medium ≥ 15, else low. When a model is configured its findings are appended with `source="claude"` and
+the same severity vocabulary, so the UI renders both identically.
+
+PII redaction runs first and unconditionally: any Aadhaar, PAN or phone number found in clause text is
+masked, flagged as a high finding, and the masked text is written back to the draft.
+
+---
+
+## 10. Document assembly
+
+| Page | Contents |
+| :--- | :--- |
+| 1 | e-Stamp certificate table (number, duty, article, parties, vendor), the deed title, party recitals, property and commercial schedule, numbered covenants |
+| 2..n-1 | Continuation of covenants, header rule from page 2 onward |
+| n | **Section 65B certificate**: signature table (name, role, UTC timestamp, signer IP, PKCS#7 hash, status) with the corporate DSC row, a metadata table (custodian, server host, agreement id, certificate number, content digest, HMAC seal, generation time), the evidentiary event log, and the statutory declaration under § 65B(4) |
+
+Pagination uses a two-pass `NumberedCanvas`: page states are buffered, the total is known at `save()`,
+and `Page X of Y` is stamped on every page.
+
+The corporate seal is `HMAC-SHA256(dsc_secret, content_digest)` where `content_digest` is a
+deterministic SHA-256 over the sorted JSON of the agreement, parties and signature hashes — that is,
+over *what the parties agreed*, not over the rendered bytes. Rendering is therefore reproducible and
+the seal is stable.

@@ -1,127 +1,124 @@
-# GoLegal Application - Agent Context & Engineering Memory
+# GoLegal — Agent Context & Engineering Memory
 
 ```yaml
-project: GoLegal Digital Contracting Web Application
+project: GoLegal — agentic digital contracting web application
 jurisdiction: India (IT Act 2000 §§ 4, 5, 10A; Indian Evidence Act 1872 § 65B; Indian Stamp Act 1899)
 stack:
-  runtime: Python 3.12+ (.venv)
-  frontend: Streamlit 1.63, streamlit-option-menu 0.4.0
-  orm_db: SQLAlchemy 2.0+, SQLite (local golegal.db) / PostgreSQL 15+ compatible
-  pdf_crypto: ReportLab 5.0+, SHA-256 digests, simulated PKCS#7 X.509 signature containers
-  test_framework: Pytest 9.1+, pytest-cov, pytest-mock (71 tests, 96% coverage)
+  runtime: Python 3.12 (.venv)
+  frontend: Streamlit 1.63 (custom design system via st.html)
+  orm_db: SQLAlchemy 2.0, SQLite (golegal.db) / PostgreSQL 15 compatible
+  documents: ReportLab 5, pypdf 6 (ingestion)
+  ai: anthropic SDK 1.4 (claude-opus-5 by default), with a deterministic offline fallback
+  tests: pytest 9 — 126 tests, 89% coverage
 port: 8501
-daemon_status: Stopped (Launch with: .\.venv\Scripts\streamlit.exe run app.py --server.port 8501 --server.headless true)
+launch: .\.venv\Scripts\streamlit.exe run app.py --server.port 8501 --server.headless true
 ```
 
 > [!IMPORTANT]
-> **MANDATORY DIRECTIVE FOR INCOMING CODING AGENTS & HARNESSES**:
-> The authoritative, exhaustive Master Product Requirements Document (PRD v1.0), Requirement Design Specification, and Software Architecture Baseline (SAD v0.3) is located in [`GoLegal_Master_PRD_Context_v2 .md`](./GoLegal_Master_PRD_Context_v2%20.md).
-> **BEFORE STARTING ANY TASK, FEATURE WORK, OR CODEBASE MODIFICATION**, you MUST thoroughly review and deeply ingest `GoLegal_Master_PRD_Context_v2 .md` to maintain total alignment with the statutory boundaries, user workflows, 5-layer architecture, and legal compliance invariants.
+> **Read before any change**: [`GoLegal_Master_PRD_Context_v2 .md`](./GoLegal_Master_PRD_Context_v2%20.md)
+> is the authoritative PRD / SAD. [`AGENTIC_GAP_ANALYSIS.md`](./AGENTIC_GAP_ANALYSIS.md) records what
+> was wrong with the previous baseline and why each thing was built the way it is — it will save you
+> from re-introducing a closed gap.
 
 ---
 
-## 1. Directory & Codebase File Map
+## 1. File map
 
 ```
 golegal_app/
-├── app.py                     # Main Streamlit router, navbar, theme styles, DB init
-├── requirements.txt           # Production & testing dependency pin
-├── golegal.db                 # SQLite 3NF database
-├── domain/
-│   ├── __init__.py            # Domain entity exports
-│   └── models.py              # 3NF SQLAlchemy models: User, Agreement, Party, EStamp,
-│                              # Signature, Payment, AuditLog, SysConfig, SysConfigJn
-├── persistence/
-│   ├── __init__.py
-│   └── database.py            # Engine, SessionLocal, init_db() bootstrapper
+├── app.py                       router: product nav, or capability-link signing page
+├── config.py                    ALL secrets, fees, thresholds, model settings (env-driven)
+├── domain/models.py             17 entities: users, agreements, parties, estamps, signatures,
+│                                payments, audit_logs, documents, otp_challenges, login_events,
+│                                notifications, feedback, agent_runs, sysconfigTlb(+$jn)
+├── persistence/database.py      engine, session_scope, additive migrations, demo seeding
 ├── security/
-│   ├── __init__.py
-│   └── cbac.py                # HMAC-SHA256 capability tokens, IDOR blocker, witness privacy,
-│                              # XSS sanitization, 27-day draft purge evaluator
+│   ├── cbac.py                  capability tokens, role→action map, witness downgrade
+│   └── auth.py                  PBKDF2, DB-backed OTP + lockout, suspicious-ingress detection
 ├── services/
-│   ├── __init__.py            # Subsystem facade exports
-│   ├── validation.py          # PAN, PIN, Email, Phone, Aadhaar masking (XXXXXXXX1234), financials
-│   ├── rule_engine.py         # State stamp duty (KA ₹100, DL ₹100, MH 0.25%) & non-derogable clauses
-│   ├── stamping_service.py    # SHCIL e-Stamp procurement, prepaid balance debit, < ₹10k alert, idempotency
-│   ├── esign_service.py       # UIDAI Aadhaar eSign OTP (123456), rate limiting (5 attempts), PKCS#7 hash
-│   ├── workflow_service.py    # Asynchronous non-atomic state machine, order-independent signing, atomic seal
-│   ├── doc_assembly.py        # ReportLab PDF assembler, Page 1 e-Stamp, NumberedCanvas (Page X of Y), 65B cert
-│   └── notification.py        # Tokenized sign links (WhatsApp/SMS) & daily reminder cron
-├── ui/
-│   ├── __init__.py
-│   ├── landing.py             # Public landing, value pillars, 3-click flow, dynamic stamp duty calculator
-│   ├── auth_profile.py        # Mobile OTP (123456), persona switch, suspicious ingress simulator
-│   ├── wizard.py              # 5-step rental agreement wizard, split-pane editor, checkout, eSign modal
-│   ├── dashboard.py           # User workspace (Pending, Completed, Drafts, MyInvoices, NPS rating)
-│   └── admin.py               # StockHolding prepaid balance monitor, debit ledger, GMV metrics, NPS logs
-└── tests/
-    ├── conftest.py            # In-memory SQLite session & domain fixtures
-    ├── test_validation.py     # 38 tests: regex, PII masking, numerical bounds
-    ├── test_rule_engine.py    # 7 tests: state duty calculation, statutory clause protection
-    ├── test_stamping.py       # 5 tests: SHCIL debit, balance alert (< ₹10k), idempotency
-    ├── test_esign.py          # 5 tests: OTP challenge, consent, rate limit lockout (5 attempts)
-    ├── test_workflow.py       # 4 tests: async order independence, atomic DSC sealing
-    ├── test_doc_assembly.py   # 3 tests: PDF layout, Page X of Y, SHA-256 tamper verification
-    ├── test_security_owasp.py # 6 tests: IDOR prevention, witness privacy, XSS, draft purge
-    └── test_notification.py   # 3 tests: tokenized URL generation, WhatsApp dispatch, reminders
+│   ├── validation.py            PAN/PIN/email/phone/Aadhaar + whole-payload validation
+│   ├── rule_engine.py           9 states' stamp duty; statutory + optional clause library
+│   ├── agreement_service.py     draft CRUD, party sync, ownership scoping, archive/restore
+│   ├── payment_service.py       server-side quote, capture, numbered GST invoice PDF
+│   ├── stamping_service.py      SHCIL procurement, prepaid ledger, low-balance guard
+│   ├── esign_service.py         Aadhaar OTP challenge + signature rows (idempotent)
+│   ├── notification.py          tokenized links, invitations, reminders, completion notices
+│   ├── document_service.py      content-addressed PDF store, digest verification
+│   ├── doc_assembly.py          e-Stamp page 1, Page X of Y, § 65B page, GST invoice
+│   └── workflow_service.py      state machine, dispatch, seal, expire, purge, reminder sweep
+├── ai/
+│   ├── llm.py                   Anthropic gateway + NullLLMClient offline fallback
+│   ├── tools.py                 tool registry — read | write | human tiers
+│   ├── copilot.py               tool-use loop + deterministic rule router
+│   ├── workflow_agent.py        observe → plan → act → journal; portfolio sweep
+│   ├── clause_intelligence.py   risk scoring, PII redaction, plain/vernacular summaries
+│   ├── contract_ingest.py       contract or brief → wizard payload
+│   └── rent_benchmark.py        fair-rent bands, deposit norms, 7 cities
+├── ui/                          theme, components, state + one module per screen
+│   └── sign.py                  counterparty signing page (capability link, no account)
+└── tests/                       126 tests across 11 modules
 ```
 
 ---
 
-## 2. Core Architectural & Legal Invariants
+## 2. Invariants — do not break these
 
-1. **Strict PII Redaction**: Raw 12-digit Aadhaar numbers are never persisted. They are ingested in memory for mock OTP verification and masked immediately to `XXXXXXXX1234` via `services.validation.mask_aadhaar()`.
-2. **StockHolding Stamping Balance Guard**: Corporate prepaid balance stored in `sysconfigTlb.stockholding_prepaid_balance`. Stamping calls debit duty in real-time. If balance $< \text{₹}10,000$, a visual crimson alert triggers on all admin pages. Debits append to `sysconfigTlb$jn`.
-3. **Non-Atomic Asynchronous Multi-Party Execution**: Signatories (`1..n` owners, `1..n` tenants, witnesses) sign independently via tokenized links without order constraints. Contract atomically transitions to `'Completed'` and applies GoLegal Corporate DSC seal only when all designated parties have signed.
-4. **Section 65B Evidentiary Audit Trail**: Terminal page of generated PDF contains server hostname, UTC timestamps, originating client IP addresses, PKCS#7 signature hashes, and SHA-256 tamper-evident checksums.
-5. **Capability-Based Access Control (CBAC)**: Document endpoints require `HMAC-SHA256` capability tokens (`security.cbac`). Tokens encode `agr_id`, `pty_id`, `role`, and `actions`. Cross-agreement tampering triggers IDOR rejection.
-6. **Witness Privacy Policy**: Witness tokens are downgraded post-signature; witnesses cannot view or download executed commercial deeds.
-7. **Zero Document Hoarding**: Agreements without explicit cloud storage consent are purged after 27 days (`sysconfigTlb.data_pruning_days`).
-
----
-
-## 3. Key Data Schemas & Table Models
-
-- `users`: `id (UUID)`, `user_type`, `full_name`, `email`, `phone`, `address`, `created_at`.
-- `agreements`: `id (UUID)`, `initiator_id (FK)`, `agreement_type`, `state_code`, `status` (`Draft`, `Paid`, `Pending_Signatures`, `Completed`, `Cancelled`, `Expired`), `property_details (JSON)`, `commercial_terms (JSON)`, `custom_clauses (Text)`, `cloud_storage_consent (Bool)`, `executed_at`.
-- `parties`: `id (UUID)`, `agreement_id (FK)`, `party_type` (`Owner`, `Tenant`, `Witness`), `full_name`, `email`, `phone`, `aadhaar_masked (XXXXXXXX1234)`, `signing_status` (`Pending`, `Signed`), `access_token`.
-- `estamps`: `id (UUID)`, `agreement_id (FK Unique)`, `certificate_number`, `state_code`, `stamp_amount`, `purchased_by`, `vendor`, `issued_at`.
-- `signatures`: `id (UUID)`, `agreement_id (FK)`, `party_id (FK)`, `auth_type`, `transaction_ref`, `signature_hash (SHA-256)`, `signed_at`, `ip_address`.
-- `payments`: `id (UUID)`, `agreement_id (FK)`, `total_amount`, `stamp_duty_amount`, `platform_fee`, `payment_gateway`, `status`.
-- `audit_logs`: `id (UUID)`, `agreement_id (FK)`, `event_type`, `triggered_by`, `event_data (JSON)`, `recorded_at`.
-- `sysconfigTlb`: `id`, `stockholding_prepaid_balance`, `low_balance_threshold (10000.0)`, `data_pruning_days (27)`.
-- `sysconfigTlb$jn`: `jn_id`, `timestamp`, `operation`, `updated_by_user`, `previous_value`, `new_value`.
+1. **Aadhaar is never stored raw.** One column, `parties.aadhaar_masked`, always `XXXXXXXX1234`. `mask_aadhaar()` is idempotent. Agent tools strip `aadhaar` from model-supplied parties. `redact_pii()` masks identity numbers found in free text before persistence.
+2. **Agents cannot pay, stamp or sign.** Those tools are tier `human` with **no handler**. This is structural, not a prompt instruction. Never give them one.
+3. **No raw UUID authorises anything.** Signing and download go through `CBACService.verify_token(token, agreement_id, action)`, which enforces the agreement match (IDOR) before the action check.
+4. **Witness privacy.** After sealing, witness tokens are downgraded to `COMPLETED_ACK` in `seal_agreement()`. Witnesses never appear in `list_for_user()` results.
+5. **Prices are computed server-side** from the persisted agreement. Never trust a client-supplied amount.
+6. **The sealed PDF is generated once.** `seal_agreement()` returns stored bytes if the digest matches, which is what makes `final_pdf_sha256` a stable evidentiary reference.
+7. **Every state change goes through `WorkflowService`,** so the state machine and the audit journal apply to humans and agents identically. Never assign `agreement.status` directly.
+8. **Escape before rendering.** `_esc()` before ReportLab, `c.esc()` before HTML.
+9. **Secrets come from `config.py`.** Nothing security-sensitive is hardcoded.
+10. **Everything works offline.** No `ANTHROPIC_API_KEY` means the rule-based path; the entire test suite runs without one.
 
 ---
 
-## 4. Key Operational Commands
+## 3. Things that will bite you
+
+- **`st.markdown` breaks a `<style>` block.** Streamlit runs markdown over the string and terminates the HTML block, printing your CSS as text. Use `st.html()` — `ui/theme.py` does.
+- **Heredocs mangle regex escapes.** Patching Python regexes through a bash heredoc turned `\b` into a literal backspace byte and silently broke intent routing. Use the Edit tool for anything containing backslashes.
+- **Do not re-save a non-Draft agreement.** `AgreementService.save_draft()` refuses once the status leaves `Draft`; the checkout step must load the row instead. This caused a real post-payment crash.
+- **The device fingerprint must be deterministic** (user agent + IP subnet). A random per-session id makes the suspicious-login detector fire on every visit.
+- **OTP attempts carry across re-issued challenges.** Without this the lockout can be reset by requesting a new code.
+- **F5 in an embedded browser may not reload Streamlit.** Navigate to the URL to force a fresh session when testing.
+
+---
+
+## 4. Commands
 
 ```powershell
-# Activate local virtualenv (Windows pwsh)
 .\.venv\Scripts\Activate.ps1
 
-# Execute full Pytest test suite with code coverage (71 tests)
-.\.venv\Scripts\pytest.exe -v --cov=services --cov=domain --cov=security tests/
+# tests (offline, no API key needed)
+.\.venv\Scripts\pytest.exe -q tests/ --cov=services --cov=domain --cov=security --cov=ai
 
-# Run Streamlit interactive application (Port 8501)
+# run
 .\.venv\Scripts\streamlit.exe run app.py --server.port 8501 --server.headless true
 
-# Check HTTP service health
-curl -I http://localhost:8501
+# enable Claude (optional; everything degrades gracefully without it)
+$env:ANTHROPIC_API_KEY = "sk-ant-..."
 ```
+
+Demo accounts (password `GoLegal@123`): `ramakiran.reddy@example.com` (owner),
+`mayank.tripathi@example.com` (tenant), `admin@golegal.in` (operations).
 
 ---
 
-## 5. Phase Documentation References
-- [`GoLegal_Master_PRD_Context_v2 .md`](./GoLegal_Master_PRD_Context_v2%20.md): **Authoritative Master PRD & SAD Baseline** (Mandatory pre-reading).
-- [`IMPLEMENTATION_PLAN.md`](./IMPLEMENTATION_PLAN.md): 5-phase roadmap, Agile schedule, and subsystem architecture.
-- [`DATASOURCE_PLAN.md`](./DATASOURCE_PLAN.md): 3NF schema, SQLite DDL, JSONB covenant schemas.
-- [`ARCHITECTURE.md`](./ARCHITECTURE.md): 5-layer model, network DMZ topology, India VPC localization.
-- [`SOFTWARE_DESIGN_DOCUMENT.md`](./SOFTWARE_DESIGN_DOCUMENT.md): Low-level design, state machines, CBAC specs.
-- [`TEST_STRATEGY_AND_PLAN.md`](./TEST_STRATEGY_AND_PLAN.md): 4-tier V&V plan, 22-category OWASP matrix.
-- [`UI_DESIGN_AND_INFO_ARCHITECTURE.md`](./UI_DESIGN_AND_INFO_ARCHITECTURE.md): UX flows, split-pane preview, session states.
-- [`SYSTEM_TEST_CASES.md`](./SYSTEM_TEST_CASES.md): 30+ traceable test case definitions.
-- [`DEPLOYMENT_PLAN.md`](./DEPLOYMENT_PLAN.md): Staging, Dockerfile, env vars, DR procedures.
-- [`USAGE_DOCUMENTATION.md`](./USAGE_DOCUMENTATION.md): Tenant, Landlord, Witness, Admin operational manuals.
-- [`SMART_EVALUATION_CRITERIA.md`](./SMART_EVALUATION_CRITERIA.md): 100-point rubric, LegalTech KPIs.
-- [`PRIORITIZED_EXECUTION_PLAN.md`](./PRIORITIZED_EXECUTION_PLAN.md): P0-P4 prioritized engineering matrix.
+## 5. Documentation
+
+| Document | Contents |
+| :--- | :--- |
+| [`GoLegal_Master_PRD_Context_v2 .md`](./GoLegal_Master_PRD_Context_v2%20.md) | Authoritative PRD & SAD baseline |
+| [`AGENTIC_GAP_ANALYSIS.md`](./AGENTIC_GAP_ANALYSIS.md) | What was missing, how each gap was closed, what remains |
+| [`ARCHITECTURE.md`](./ARCHITECTURE.md) | 6-layer model, trust boundaries, agent loop, lifecycle, deployment |
+| [`SOFTWARE_DESIGN_DOCUMENT.md`](./SOFTWARE_DESIGN_DOCUMENT.md) | Domain model, CBAC, OTP, tool contract, assembly engine |
+| [`UI_DESIGN_AND_INFO_ARCHITECTURE.md`](./UI_DESIGN_AND_INFO_ARCHITECTURE.md) | Design thesis, tokens, screens, components, a11y |
+| [`TEST_STRATEGY_AND_PLAN.md`](./TEST_STRATEGY_AND_PLAN.md) | V&V plan and OWASP matrix |
+| [`SYSTEM_TEST_CASES.md`](./SYSTEM_TEST_CASES.md) | Traceable test cases |
+| [`DEPLOYMENT_PLAN.md`](./DEPLOYMENT_PLAN.md) | Containerisation, env vars, DR |
+| [`USAGE_DOCUMENTATION.md`](./USAGE_DOCUMENTATION.md) | Persona manuals |
+| [`DATASOURCE_PLAN.md`](./DATASOURCE_PLAN.md) | Schema and DDL |
+| [`IMPLEMENTATION_PLAN.md`](./IMPLEMENTATION_PLAN.md), [`PRIORITIZED_EXECUTION_PLAN.md`](./PRIORITIZED_EXECUTION_PLAN.md), [`SMART_EVALUATION_CRITERIA.md`](./SMART_EVALUATION_CRITERIA.md) | Roadmap, backlog, rubric |
