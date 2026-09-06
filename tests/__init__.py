@@ -1,0 +1,3 @@
+"""
+GoLegal Tests Package
+"""
