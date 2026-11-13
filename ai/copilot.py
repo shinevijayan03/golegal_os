@@ -19,7 +19,7 @@ from config import settings
 from domain.models import AgentRun, utc_now
 from services.rule_engine import STATE_STAMP_RULES
 
-SYSTEM_PROMPT = """You are GoLegal Copilot, the in-product assistant of GoLegal - an Indian platform for drafting, e-stamping and Aadhaar e-signing rental agreements in under ten minutes.
+SYSTEM_PROMPT = """You are GoLegal OS Copilot, the in-product assistant of GoLegal OS — the agentic operating system for legal work, an Indian platform for drafting, e-stamping and Aadhaar e-signing rental agreements in under ten minutes.
 
 How you work
 - You help tenants, owners and witnesses draft, understand, price and track agreements. Use the tools for anything factual: prices always come from calculate_stamp_duty, rent norms from get_rent_benchmark, clause safety from assess_clause_risk.
@@ -29,7 +29,7 @@ How you work
 - Be concrete and brief. Use rupee amounts with the ₹ symbol. No legal disclaimers unless the user asks about enforceability; then explain the IT Act 2000 and Section 65B basis in one or two sentences.
 - If a question is outside residential/commercial contracting in India, say so and point to what you can help with.
 
-Statutory context: 11-month residential rentals need e-stamp paper (Karnataka/Delhi ₹100 flat; Maharashtra 0.25% leave-and-licence) and are valid without registration; 12 months or more need Sub-Registrar registration. Aadhaar eSign is recognised under Sections 4, 5 and 10A of the IT Act 2000; GoLegal appends a Section 65B certificate to every sealed deed. Witnesses attest but do not receive a copy of the executed deed.
+Statutory context: 11-month residential rentals need e-stamp paper (Karnataka/Delhi ₹100 flat; Maharashtra 0.25% leave-and-licence) and are valid without registration; 12 months or more need Sub-Registrar registration. Aadhaar eSign is recognised under Sections 4, 5 and 10A of the IT Act 2000; GoLegal OS appends a Section 65B certificate to every sealed deed. Witnesses attest but do not receive a copy of the executed deed.
 """
 
 STATE_WORDS = {v["name"].lower(): k for k, v in STATE_STAMP_RULES.items()}
@@ -204,7 +204,7 @@ class Copilot:
             if nums.get("deposit"):
                 inp["security_deposit"] = nums["deposit"]
             q = self._run("calculate_stamp_duty", **inp)
-            text = (f"For {q['state_name']} ({q['article']}): stamp duty ₹{q['stamp_duty_amount']:,.2f}, GoLegal fee ₹{q['platform_fee']:,.2f}, "
+            text = (f"For {q['state_name']} ({q['article']}): stamp duty ₹{q['stamp_duty_amount']:,.2f}, GoLegal OS fee ₹{q['platform_fee']:,.2f}, "
                     f"GST ₹{q['gst_amount']:,.2f} - total ₹{q['total_payable']:,.2f}.")
             if q["state_code"] == "MH":
                 text += " Maharashtra duty is 0.25% of the total consideration (rent for the term plus 10% notional interest on the deposit), minimum ₹500."
@@ -314,7 +314,7 @@ class Copilot:
 
     @staticmethod
     def _help_text() -> str:
-        return ("I'm GoLegal Copilot. I can:\n"
+        return ("I'm GoLegal OS Copilot. I can:\n"
                 "- **Draft** an agreement from a sentence (\"2BHK in Bellandur, rent 28k, deposit 1.2L, owner Ramakiran, tenant Mayank\")\n"
                 "- **Price** it: stamp duty, platform fee and GST for any state\n"
                 "- **Check** fair rent and deposit norms for your locality\n"

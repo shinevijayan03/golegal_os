@@ -24,11 +24,11 @@ def money(value: Any) -> str:
         return "₹0"
 
 
-def brand(tagline: str = "Digital contracting, India") -> None:
+def brand(tagline: str = "The agentic operating system for legal work.") -> None:
     st.markdown(f"""
     <div class="gl-brand gl-fade">
       <div class="mark">G</div>
-      <div class="name">GoLegal</div>
+      <div class="name">GoLegal OS</div>
       <span class="tag">{esc(tagline)}</span>
     </div>""", unsafe_allow_html=True)
 
@@ -194,7 +194,7 @@ def how_it_works() -> None:
     steps = [
         ("1", "Describe the tenancy", "Type it, paste an old agreement, or fill the form. Copilot drafts the deed on lawyer-vetted clauses and flags anything unfair."),
         ("2", "Pay once, stamped instantly", "One payment covers state stamp duty and the platform fee. The e-Stamp certificate from StockHolding becomes page one of your deed."),
-        ("3", "Everyone signs from their phone", "Each party gets a private link and signs with Aadhaar OTP - in any order, from anywhere. GoLegal seals the deed and issues the Section 65B certificate."),
+        ("3", "Everyone signs from their phone", "Each party gets a private link and signs with Aadhaar OTP - in any order, from anywhere. GoLegal OS seals the deed and issues the Section 65B certificate."),
     ]
     st.markdown('<div class="gl-how gl-fade">' + "".join(
         f'<div class="st"><div class="n">{n}</div><div class="t">{esc(t)}</div><p>{esc(p)}</p></div>' for n, t, p in steps) + "</div>",

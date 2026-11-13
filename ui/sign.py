@@ -59,7 +59,7 @@ def render_signing_page(session, token: str, agreement_id: str, party_id: str) -
         try:
             cbac.verify_token(token, agreement_id, "COMPLETED_ACK")
             c.notice("<b>Thank you — your attestation is recorded.</b> As a witness you do not receive a copy of the "
-                     "executed deed. This is GoLegal's witness privacy policy.", "ok")
+                     "executed deed. This is GoLegal OS's witness privacy policy.", "ok")
             _exit_link()
             return
         except Exception:
@@ -125,7 +125,7 @@ def render_signing_page(session, token: str, agreement_id: str, party_id: str) -
         elif can_sign and agreement.status == "Pending_Signatures":
             with st.container(border=True):
                 st.markdown("##### Sign with Aadhaar")
-                st.markdown("""<div class="gl-notice info"><b>UIDAI consent.</b> I voluntarily authorise GoLegal and its licensed
+                st.markdown("""<div class="gl-notice info"><b>UIDAI consent.</b> I voluntarily authorise GoLegal OS and its licensed
                 eSign Service Provider to authenticate my identity with UIDAI using Aadhaar OTP, solely to affix my electronic
                 signature to this deed under Sections 4 and 5 of the Information Technology Act, 2000. My Aadhaar number is not stored.
                 <br/><span style="font-size:.85rem">मैं इस अनुबंध पर हस्ताक्षर हेतु आधार OTP द्वारा पहचान सत्यापन की स्वेच्छा से सहमति देता/देती हूँ।</span></div>""",
@@ -168,11 +168,11 @@ def render_signing_page(session, token: str, agreement_id: str, party_id: str) -
             if can_download:
                 pdf = workflow.final_pdf(agreement)
                 if pdf:
-                    st.download_button("Download the sealed agreement", data=pdf, file_name=f"GoLegal_{agreement.id[:8]}.pdf",
+                    st.download_button("Download the sealed agreement", data=pdf, file_name=f"GoLegal_OS_{agreement.id[:8]}.pdf",
                                        mime="application/pdf", type="primary", use_container_width=True, key="sign_dl")
                     st.caption(f"SHA-256 {agreement.final_pdf_sha256}")
             else:
-                c.notice("The deed is sealed. As a witness you do not receive a copy — GoLegal's witness privacy policy.", "info")
+                c.notice("The deed is sealed. As a witness you do not receive a copy — GoLegal OS's witness privacy policy.", "info")
 
     st.write("")
     st.caption("This link is a single-purpose capability token. It works only for this agreement and only for your role. "

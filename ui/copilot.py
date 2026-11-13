@@ -39,7 +39,7 @@ def _render_thread(session, user, container, compact: bool) -> None:
     with container:
         if not hist:
             with st.chat_message("assistant", avatar="⚖️"):
-                st.markdown("Hi, I'm **GoLegal Copilot**. Describe the tenancy in a sentence and I'll draft it, or ask me about "
+                st.markdown("Hi, I'm **GoLegal OS Copilot**. Describe the tenancy in a sentence and I'll draft it, or ask me about "
                             "stamp duty, clauses, fair rent or who has signed.")
                 if not compact:
                     st.caption(f"Model: {llm.model if llm.available else 'built-in rules (set ANTHROPIC_API_KEY for Claude)'}")

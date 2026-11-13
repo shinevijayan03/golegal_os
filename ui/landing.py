@@ -13,7 +13,7 @@ from ui.state import go, reset_wizard
 
 
 def render_landing_page(user=None) -> None:
-    c.eyebrow("Rental agreements · e-Stamp · Aadhaar eSign")
+    c.eyebrow("GoLegal OS · The agentic operating system for legal work.")
     c.display("A stamped, signed rental deed.<br/><em>Ten minutes.</em> No broker, no queue.",
               "Draft on lawyer-vetted clauses, pay stamp duty online, and let everyone sign from their phone. "
               "Valid in Indian courts under the IT Act 2000, with a Section 65B certificate attached.")
@@ -74,10 +74,10 @@ def render_landing_page(user=None) -> None:
     st.write("")
     st.markdown("#### Questions people ask")
     faq = [
-        ("Is an e-signed rental agreement valid in court?", "Yes. Sections 4, 5 and 10A of the IT Act 2000 recognise electronic records and Aadhaar-based electronic signatures. GoLegal appends a Section 65B certificate so the deed is admissible as evidence."),
-        ("Do we still need to register it?", "11-month residential agreements only need stamp duty, which GoLegal pays through StockHolding. Leases of 12 months or more must additionally be registered with the Sub-Registrar."),
+        ("Is an e-signed rental agreement valid in court?", "Yes. Sections 4, 5 and 10A of the IT Act 2000 recognise electronic records and Aadhaar-based electronic signatures. GoLegal OS appends a Section 65B certificate so the deed is admissible as evidence."),
+        ("Do we still need to register it?", "11-month residential agreements only need stamp duty, which GoLegal OS pays through StockHolding. Leases of 12 months or more must additionally be registered with the Sub-Registrar."),
         ("What if my landlord is not tech-savvy?", "They receive a WhatsApp/SMS link, tap it, read the deed in plain language (Hindi and Kannada summaries are available) and enter the OTP sent to their Aadhaar-linked mobile. Nothing to install."),
-        ("What happens to my Aadhaar number?", "It is used once for OTP verification and immediately masked to XXXXXXXX1234. GoLegal never stores the full number."),
+        ("What happens to my Aadhaar number?", "It is used once for OTP verification and immediately masked to XXXXXXXX1234. GoLegal OS never stores the full number."),
     ]
     for q_, a_ in faq:
         with st.expander(q_):

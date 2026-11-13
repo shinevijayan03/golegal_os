@@ -85,7 +85,7 @@ def benchmark(city: str, locality: str = "", bhk: str = "2BHK", monthly_rent: Op
         bhk = "2BHK"
     if city_key not in MICRO_MARKET:
         return {"supported": False, "city": city, "message": f"No benchmark data for {city or 'this city'} yet. "
-                "GoLegal currently covers Bangalore, Delhi, Gurgaon, Mumbai, Hyderabad, Chennai and Pune."}
+                "GoLegal OS currently covers Bangalore, Delhi, Gurgaon, Mumbai, Hyderabad, Chennai and Pune."}
 
     locality_name, band = _find_locality(MICRO_MARKET[city_key], locality)
     low, high = band[bhk]

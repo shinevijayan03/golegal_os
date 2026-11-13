@@ -51,7 +51,7 @@ def _agreement_card(session, agreement: Agreement, user: User, workflow: Workflo
                 is_witness_only = all(p.party_type == "Witness" for p in agreement.parties
                                       if (p.email or "").lower() == (user.email or "").lower())
                 if pdf and not is_witness_only:
-                    st.download_button("Download deed", data=pdf, file_name=f"GoLegal_{agreement.id[:8]}.pdf", mime="application/pdf",
+                    st.download_button("Download deed", data=pdf, file_name=f"GoLegal_OS_{agreement.id[:8]}.pdf", mime="application/pdf",
                                        key=f"dl_{agreement.id}", use_container_width=True, type="primary")
 
         with st.expander("Details, parties and actions"):
@@ -98,7 +98,7 @@ def _agreement_card(session, agreement: Agreement, user: User, workflow: Workflo
 
 
 def _nps_block(session, user: User) -> None:
-    st.markdown("**How likely are you to recommend GoLegal?**")
+    st.markdown("**How likely are you to recommend GoLegal OS?**")
     score = st.slider("0 = not at all, 10 = extremely likely", 0, 10, 9, key="nps_score")
     category, comment = None, ""
     if score <= 8:
@@ -152,7 +152,7 @@ def render_dashboard(session, user) -> None:
     st.write("")
     tabs = st.tabs([f"Awaiting signatures ({counts.get('Paid', 0) + counts.get('Pending_Signatures', 0)})",
                     f"Executed ({counts.get('Completed', 0)})", f"Drafts ({counts.get('Draft', 0)})",
-                    "Invoices", "Archived", "Rate GoLegal"])
+                    "Invoices", "Archived", "Rate GoLegal OS"])
 
     with tabs[0]:
         pending = [a for a in rows if a.status in ("Paid", "Pending_Signatures")]

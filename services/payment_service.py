@@ -68,7 +68,7 @@ class PaymentService:
         invoice = {
             "invoice_number": payment.invoice_number,
             "issued_at": utc_now(),
-            "customer_name": payer.full_name if payer else "GoLegal Customer",
+            "customer_name": payer.full_name if payer else "GoLegal OS Customer",
             "customer_email": payer.email if payer else "-",
             "agreement_id": agreement.id,
             "gateway": gateway,

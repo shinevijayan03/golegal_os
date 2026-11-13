@@ -220,7 +220,7 @@ PARTY_SCHEMA = {"type": "array", "items": _obj({
 
 def build_registry(ctx: ToolContext) -> "ToolRegistry":
     specs = [
-        ToolSpec("calculate_stamp_duty", "Compute statutory stamp duty, GoLegal platform fee, GST and total payable for a state and rent terms. Always use this instead of guessing prices.",
+        ToolSpec("calculate_stamp_duty", "Compute statutory stamp duty, GoLegal OS platform fee, GST and total payable for a state and rent terms. Always use this instead of guessing prices.",
                  _obj({"state_code": {"type": "string"}, "monthly_rent": {"type": "number"}, "security_deposit": {"type": "number"}, "lease_months": {"type": "integer"}}),
                  "read", _t_stamp_duty),
         ToolSpec("list_supported_states", "List states with stamp rules and cities with rent benchmarks.", _obj({}), "read", _t_states),

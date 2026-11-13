@@ -35,7 +35,8 @@ def _env_bool(name: str, default: bool) -> bool:
 @dataclass(frozen=True)
 class Settings:
     # ---- Runtime -----------------------------------------------------------
-    app_name: str = "GoLegal"
+    app_name: str = "GoLegal OS"
+    tagline: str = "The agentic operating system for legal work."
     environment: str = os.getenv("GOLEGAL_ENV", "development")
     database_url: str = os.getenv("DATABASE_URL", "sqlite:///./golegal.db")
     base_url: str = os.getenv("GOLEGAL_BASE_URL", "http://localhost:8501")
@@ -78,7 +79,7 @@ class Settings:
          "phone": "9876543211", "user_type": "Single_User", "address": "Flat 202, Green Glen, Bellandur, Bangalore"},
         {"id": "usr-owner-001", "full_name": "Ramakiran Reddy", "email": "ramakiran.reddy@example.com",
          "phone": "9876543210", "user_type": "Single_User", "address": "101, Palm Meadows, Mahadevapura, Bangalore"},
-        {"id": "usr-admin-001", "full_name": "GoLegal Operations", "email": "admin@golegal.in",
+        {"id": "usr-admin-001", "full_name": "GoLegal OS Operations", "email": "admin@golegal.in",
          "phone": "9876543299", "user_type": "Admin", "address": "GoLegal HQ, Bangalore"},
     ))
 

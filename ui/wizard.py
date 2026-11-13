@@ -62,7 +62,7 @@ def _party_form(group_key: str, label: str, wiz_payload: Dict[str, Any], require
             person["email"] = r2[0].text_input("Email", value=person["email"], key=f"{group_key}_{idx}_email")
             if aadhaar:
                 raw = r2[1].text_input("Aadhaar (stored masked)", value=person["aadhaar"], key=f"{group_key}_{idx}_aadhaar",
-                                       type="password", help="Used once for OTP. GoLegal stores only XXXXXXXX1234.")
+                                       type="password", help="Used once for OTP. GoLegal OS stores only XXXXXXXX1234.")
                 person["aadhaar"] = raw
             if group_key != "witnesses":
                 r3 = st.columns([1, 2])
@@ -80,7 +80,7 @@ def _party_form(group_key: str, label: str, wiz_payload: Dict[str, Any], require
 def _ingest_panel(wiz: Dict[str, Any]) -> None:
     """Digitise an existing contract or a plain-English brief into the draft."""
     with st.expander("Start from an existing contract or a sentence", expanded=False):
-        st.caption("Paste an old agreement, upload a PDF, or just describe the tenancy. GoLegal extracts the terms and fills the form.")
+        st.caption("Paste an old agreement, upload a PDF, or just describe the tenancy. GoLegal OS extracts the terms and fills the form.")
         text = st.text_area("Paste text or describe the tenancy", height=110, key="ingest_text",
                             placeholder="2BHK at Sunrise Apartments 402, Bellandur, Bangalore 560103. Rent 28,000, deposit 1.2 lakh, "
                                         "11 months, lock-in 6, notice 30 days. Owner Ramakiran Reddy 9876543210, tenant Mayank Tripathi 9876543211.")
@@ -122,7 +122,7 @@ def _step_jurisdiction(wiz: Dict[str, Any]) -> None:
             p["title"] = st.text_input("Give it a name (optional)", value=p.get("title", ""), placeholder="Sunrise Apartments 402 — rental")
             if p["agreement_type"] == "Rental_Residential":
                 c.notice("11-month residential tenancies need e-Stamp duty only. A term of 12 months or more must also be "
-                         "registered with the Sub-Registrar, which GoLegal does not do.", "info")
+                         "registered with the Sub-Registrar, which GoLegal OS does not do.", "info")
         st.write("")
         _ingest_panel(wiz)
     with right:
@@ -195,7 +195,7 @@ def _step_parties(wiz: Dict[str, Any]) -> None:
         st.caption("Witnesses attest the execution. They sign but never receive a copy of the executed deed.")
         _party_form("witnesses", "Witness", p, max_count=2)
         if not p.get("witnesses"):
-            c.notice("No witnesses added. Rental deeds are customarily attested by two witnesses; GoLegal also offers an "
+            c.notice("No witnesses added. Rental deeds are customarily attested by two witnesses; GoLegal OS also offers an "
                      "institutional witness service.", "warn")
 
     st.write("")
@@ -325,7 +325,7 @@ def _step_checkout(wiz: Dict[str, Any], session, user: User) -> None:
 | Item | Amount |
 | :--- | ---: |
 | State stamp duty — {c.esc(quote['state_name'])} ({c.esc(quote['article'])}) | {c.money(quote['stamp_duty_amount'])} |
-| GoLegal platform fee | {c.money(quote['platform_fee'])} |
+| GoLegal OS platform fee | {c.money(quote['platform_fee'])} |
 | GST @ 18% on platform fee | {c.money(quote['gst_amount'])} |
 | **Total payable** | **{c.money(quote['total_payable'])}** |
 """)
@@ -381,7 +381,7 @@ def _step_checkout(wiz: Dict[str, Any], session, user: User) -> None:
             c.stat("Platform stamping pool", c.money(stamping.get_prepaid_balance()),
                    "Live SHCIL prepaid balance", tone="danger" if stamping.is_low_balance() else "ok")
             st.write("")
-            c.card("What happens on payment", "GoLegal debits the state duty from its SHCIL prepaid account, receives a certificate "
+            c.card("What happens on payment", "GoLegal OS debits the state duty from its SHCIL prepaid account, receives a certificate "
                                               "number, and merges the certificate into your deed. Every debit is journaled for reconciliation.")
 
     nav = st.columns([1, 4])
@@ -407,7 +407,7 @@ def _step_sign(wiz: Dict[str, Any], session, user: User) -> None:
         return
 
     if agreement.status == "Paid":
-        c.notice("Ready to dispatch. GoLegal will send each party a private, single-purpose link over WhatsApp, SMS and email.", "info")
+        c.notice("Ready to dispatch. GoLegal OS will send each party a private, single-purpose link over WhatsApp, SMS and email.", "info")
         if st.button("Send signing links to all parties", type="primary"):
             with st.spinner("Minting capability tokens and dispatching…"):
                 wiz["dispatched"] = workflow.open_for_signatures(agreement, triggered_by=user.id)
@@ -458,7 +458,7 @@ def _step_sign(wiz: Dict[str, Any], session, user: User) -> None:
             c.notice("<b>Executed and sealed.</b> The corporate DSC is applied and the Section 65B certificate is attached.", "ok")
             pdf = workflow.final_pdf(agreement)
             if pdf:
-                st.download_button("Download sealed agreement", data=pdf, file_name=f"GoLegal_{agreement.id[:8]}.pdf",
+                st.download_button("Download sealed agreement", data=pdf, file_name=f"GoLegal_OS_{agreement.id[:8]}.pdf",
                                    mime="application/pdf", type="primary", use_container_width=True, key="dl_final_wizard")
                 c.kv({"SHA-256 digest": agreement.final_pdf_sha256 or "", "Executed at": agreement.executed_at.strftime("%d %b %Y %H:%M UTC") if agreement.executed_at else ""})
             st.write("")
@@ -478,7 +478,7 @@ def _esign_modal(session, esign: ESignService, workflow: WorkflowService, agreem
     st.write("")
     with st.container(border=True):
         st.markdown(f"##### Aadhaar eSign — {c.esc(party.full_name)}")
-        st.markdown("""<div class="gl-notice info"><b>UIDAI consent.</b> I voluntarily authorise GoLegal and its licensed eSign Service
+        st.markdown("""<div class="gl-notice info"><b>UIDAI consent.</b> I voluntarily authorise GoLegal OS and its licensed eSign Service
         Provider to authenticate my identity with UIDAI using Aadhaar OTP, solely to affix my electronic signature to this deed under
         Sections 4 and 5 of the Information Technology Act, 2000. My Aadhaar number is not stored.<br/>
         <span style="font-size:.85rem">मैं स्वेच्छा से इस अनुबंध पर हस्ताक्षर करने हेतु आधार OTP द्वारा पहचान सत्यापन की सहमति देता/देती हूँ।</span></div>""",

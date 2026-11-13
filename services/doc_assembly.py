@@ -80,12 +80,12 @@ class NumberedCanvas(canvas.Canvas):
         self.setFont("Helvetica", 9)
         self.setFillColor(MUTED)
         if self._pageNumber > 1:
-            self.drawString(54, 750, "GoLegal Certified Digital Contract - Section 65B Compliant")
+            self.drawString(54, 750, "GoLegal OS Certified Digital Contract - Section 65B Compliant")
             self.setStrokeColor(LINE)
             self.setLineWidth(0.5)
             self.line(54, 742, 558, 742)
         self.drawRightString(558, 36, f"Page {self._pageNumber} of {page_count}")
-        self.drawString(54, 36, "Secured by GoLegal Cryptographic Seal (SHA-256)")
+        self.drawString(54, 36, "Secured by GoLegal OS Cryptographic Seal (SHA-256)")
         self.setStrokeColor(LINE)
         self.setLineWidth(0.5)
         self.line(54, 48, 558, 48)
@@ -138,8 +138,8 @@ class DocumentAssemblyEngine:
         """Build and assemble the complete legal contract PDF into bytes."""
         buffer = io.BytesIO()
         doc = SimpleDocTemplate(buffer, pagesize=letter, leftMargin=54, rightMargin=54, topMargin=54, bottomMargin=54,
-                                title=f"GoLegal {agreement_data.get('agreement_type', 'Agreement')}",
-                                author="GoLegal Document Assembly Engine")
+                                title=f"GoLegal OS {agreement_data.get('agreement_type', 'Agreement')}",
+                                author="GoLegal OS Document Assembly Engine")
         story: List[Any] = []
         audit = audit or {}
 
@@ -161,7 +161,7 @@ class DocumentAssemblyEngine:
         if estamp:
             cert_num = estamp.get("certificate_number", "IN-KA-MOCK-0001")
             duty_amt = float(estamp.get("stamp_amount", 100.0))
-            purchaser = estamp.get("purchased_by", "GoLegal Platform User")
+            purchaser = estamp.get("purchased_by", "GoLegal OS Platform User")
             issued = _fmt_dt(estamp.get("issued_at"), "%d-%b-%Y %H:%M")
             uid_ref = f"SUBIN-{state}-{cert_num[-10:]}"
         else:
@@ -173,7 +173,7 @@ class DocumentAssemblyEngine:
             [Paragraph(f"<b>GOVERNMENT OF {_esc(state_name).upper()} - e-STAMP CERTIFICATE</b>", self.cert_banner_style), ""],
             ["Certificate No:", cert_num],
             ["Certificate Issued Date:", issued],
-            ["Account Reference:", f"SHCIL/{state}/GOLEGAL/01"],
+            ["Account Reference:", f"SHCIL/{state}/GOLEGAL_OS/01"],
             ["Unique Doc Reference:", uid_ref],
             ["Purchased by:", purchaser],
             ["Description of Document:", STATE_STAMP_RULES.get(state, {}).get("article", "Lease")],
@@ -284,7 +284,7 @@ class DocumentAssemblyEngine:
         digest = self.content_digest(agreement_data, parties, signatures)
         seal = self.corporate_seal(digest) if signatures and not is_draft else "PENDING-ALL-SIGNATURES"
         sig_rows.append([
-            Paragraph("GoLegal Corporate DSC", self.cell_style), "Certifying Authority",
+            Paragraph("GoLegal OS Corporate DSC", self.cell_style), "Certifying Authority",
             _fmt_dt(audit.get("sealed_at") or executed_on, "%d-%b-%Y %H:%M:%S"),
             audit.get("server_host", socket.gethostname())[:15],
             Paragraph(f"{seal[:32]}...", self.cell_style),
@@ -306,7 +306,7 @@ class DocumentAssemblyEngine:
         story.append(Spacer(1, 14))
 
         meta_rows = [
-            ["System Custodian", f"{settings.company_name} / GoLegal Platform"],
+            ["System Custodian", f"{settings.company_name} / GoLegal OS Platform"],
             ["Server Host", audit.get("server_host", socket.gethostname())],
             ["Agreement ID", agreement_data.get("agreement_id", "-")],
             ["e-Stamp Certificate", cert_num],
@@ -346,7 +346,7 @@ class DocumentAssemblyEngine:
 
         story.append(Paragraph(
             "<b>STATUTORY DECLARATION UNDER SECTION 65B(4):</b><br/>"
-            "I hereby certify that the electronic contracting record above was produced by the GoLegal automated computer "
+            "I hereby certify that the electronic contracting record above was produced by the GoLegal OS automated computer "
             "system during its ordinary operational course; that the computer was operating properly throughout; and that the "
             "cryptographic SHA-256 digests, PKCS#7 signature hashes and timestamps above establish unimpaired integrity and non-repudiation.",
             ParagraphStyle("CertDec", parent=self.body_style, fontSize=8.5, textColor=colors.HexColor("#475569"))))
@@ -361,10 +361,10 @@ class DocumentAssemblyEngine:
         """GST-compliant tax invoice for the platform fee and stamp duty collected."""
         buffer = io.BytesIO()
         doc = SimpleDocTemplate(buffer, pagesize=letter, leftMargin=54, rightMargin=54, topMargin=54, bottomMargin=54,
-                                title=f"GoLegal Tax Invoice {invoice.get('invoice_number', '')}")
+                                title=f"GoLegal OS Tax Invoice {invoice.get('invoice_number', '')}")
         story: List[Any] = [
             Paragraph("<b>TAX INVOICE</b>", self.title_style),
-            Paragraph(f"<b>{_esc(settings.company_name)}</b> - GoLegal Digital Contracting<br/>GSTIN: {_esc(settings.company_gstin)} | "
+            Paragraph(f"<b>{_esc(settings.company_name)}</b> - GoLegal OS Digital Contracting<br/>GSTIN: {_esc(settings.company_gstin)} | "
                       f"Place of supply: {_esc(settings.company_state)}<br/>{_esc(settings.support_email)}", self.body_style),
             Spacer(1, 10),
         ]
@@ -384,7 +384,7 @@ class DocumentAssemblyEngine:
         duty = float(invoice.get("stamp_duty_amount", 0))
         rows = [
             ["#", "Description", "HSN/SAC", "Taxable Value", "GST", "Amount (Rs.)"],
-            ["1", "GoLegal platform service fee (drafting, e-sign orchestration, sealing)", "998319", f"{fee:,.2f}", f"{gst:,.2f} (18%)", f"{fee + gst:,.2f}"],
+            ["1", "GoLegal OS platform service fee (drafting, e-sign orchestration, sealing)", "998319", f"{fee:,.2f}", f"{gst:,.2f} (18%)", f"{fee + gst:,.2f}"],
             ["2", f"State stamp duty remitted to SHCIL ({invoice.get('state_code', 'KA')}) - pure agent, non-taxable", "-", f"{duty:,.2f}", "0.00", f"{duty:,.2f}"],
             ["", "", "", "", Paragraph("<b>Total Paid</b>", self.cell_style), Paragraph(f"<b>{float(invoice.get('total_amount', fee + gst + duty)):,.2f}</b>", self.cell_style)],
         ]
@@ -396,7 +396,7 @@ class DocumentAssemblyEngine:
             ("LINEABOVE", (4, -1), (-1, -1), 0.8, NAVY),
         ]))
         story += [lt, Spacer(1, 18),
-                  Paragraph("This is a computer-generated invoice digitally signed by GoLegal and does not require a physical signature. "
+                  Paragraph("This is a computer-generated invoice digitally signed by GoLegal OS and does not require a physical signature. "
                             "Stamp duty is collected on behalf of the State Government and remitted through Stock Holding Corporation of India Ltd.",
                             self.small_style),
                   Paragraph(f"Invoice digest (SHA-256): {invoice.get('digest', '-')}", self.small_style)]

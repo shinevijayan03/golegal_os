@@ -73,9 +73,9 @@ CLAUSE_GLOSSARY: Dict[str, str] = {
     "escalation": "The percentage by which rent increases on renewal, typically 5% or 10% per year.",
     "e-stamp": "An electronic stamp paper issued by Stock Holding Corporation of India (SHCIL). It proves state stamp duty was paid and is what makes the deed admissible as evidence.",
     "stamp duty": "A state tax on legal instruments. Karnataka and Delhi charge a flat ₹100 for 11-month rentals; Maharashtra charges 0.25% of the total consideration for leave and licence.",
-    "aadhaar esign": "A legally recognised electronic signature under the IT Act 2000 where a licensed Certifying Authority issues a one-time certificate after Aadhaar OTP verification. GoLegal never stores your full Aadhaar number.",
-    "section 65b": "Section 65B of the Indian Evidence Act lets electronic records be produced in court when accompanied by a certificate describing how they were generated. GoLegal appends this certificate to every sealed deed.",
-    "witness": "Witnesses attest that the parties signed. Rental agreements usually have two. Witnesses only sign; they do not receive a copy of the executed deed on GoLegal.",
+    "aadhaar esign": "A legally recognised electronic signature under the IT Act 2000 where a licensed Certifying Authority issues a one-time certificate after Aadhaar OTP verification. GoLegal OS never stores your full Aadhaar number.",
+    "section 65b": "Section 65B of the Indian Evidence Act lets electronic records be produced in court when accompanied by a certificate describing how they were generated. GoLegal OS appends this certificate to every sealed deed.",
+    "witness": "Witnesses attest that the parties signed. Rental agreements usually have two. Witnesses only sign; they do not receive a copy of the executed deed on GoLegal OS.",
     "leave and licence": "Maharashtra's form of rental arrangement: a licence to occupy rather than a lease. It must be registered and stamped under Article 36A.",
     "peaceful enjoyment": "The tenant's right to use the premises without interference from the owner, who must give notice before visiting.",
     "painting deduction": "A customary deduction (often one month's rent) from the deposit to repaint the premises when the tenant vacates.",
@@ -197,7 +197,7 @@ class ClauseIntelligence:
         if pii_count:
             findings.append(RiskFinding("PII_IN_CLAUSE", "high", "Personal identifiers in clause text",
                                         f"{pii_count} Aadhaar/PAN/phone value(s) were found in the custom covenants. Identity numbers belong in the party records, masked, not in the deed body.",
-                                        "GoLegal has masked them. Remove them from the clause text.",
+                                        "GoLegal OS has masked them. Remove them from the clause text.",
                                         source="pii-scan"))
         lowered = custom_text.lower()
         for rule in RISKY_PATTERNS:
@@ -311,7 +311,7 @@ class ClauseIntelligence:
         if self.llm.available:
             try:
                 resp = self.llm.complete(
-                    "You are GoLegal's contract assistant for Indian residential rentals. Explain the term in two or three plain sentences. No legal advice disclaimers.",
+                    "You are GoLegal OS's contract assistant for Indian residential rentals. Explain the term in two or three plain sentences. No legal advice disclaimers.",
                     [{"role": "user", "content": query}], max_tokens=400)
                 return resp.text
             except LLMUnavailableError:

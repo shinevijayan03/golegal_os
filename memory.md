@@ -1,7 +1,9 @@
-# GoLegal — Agent Context & Engineering Memory
+# GoLegal OS — Agent Context & Engineering Memory
 
 ```yaml
-project: GoLegal — agentic digital contracting web application
+project: GoLegal OS — the agentic operating system for legal work
+tagline: "The agentic operating system for legal work."
+repository: https://github.com/shinevijayan03/golegal_os.git
 jurisdiction: India (IT Act 2000 §§ 4, 5, 10A; Indian Evidence Act 1872 § 65B; Indian Stamp Act 1899)
 stack:
   runtime: Python 3.12 (.venv)

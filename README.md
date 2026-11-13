@@ -1,9 +1,13 @@
-# GoLegal
+# GoLegal OS
+
+> **The agentic operating system for legal work.**
 
 **A stamped, signed rental deed in ten minutes.** Draft on lawyer-vetted clauses, pay state stamp duty
 online, and let every party sign with Aadhaar OTP from their own phone — in any order, from anywhere.
 Valid in Indian courts under the Information Technology Act 2000, with a Section 65B evidentiary
 certificate attached to every sealed deed.
+
+[![Repository](https://img.shields.io/badge/GitHub-shinevijayan03%2Fgolegal__os-blue.svg)](https://github.com/shinevijayan03/golegal_os)
 
 [![Python 3.12](https://img.shields.io/badge/python-3.12-blue.svg)](https://www.python.org/downloads/)
 [![Streamlit](https://img.shields.io/badge/Streamlit-1.63-FF4B4B.svg)](https://streamlit.io)

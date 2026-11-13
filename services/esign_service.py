@@ -143,7 +143,7 @@ class ESignService:
             party_id=party_id,
             auth_type="Aadhaar_OTP",
             transaction_ref=tx_ref,
-            cert_issuer="GoLegal Licensed CCA ESP (NSDL/eMudhra)",
+            cert_issuer="GoLegal OS Licensed CCA ESP (NSDL/eMudhra)",
             signature_hash=sig_hash,
             signed_at=signed_at,
             ip_address=client_ip,

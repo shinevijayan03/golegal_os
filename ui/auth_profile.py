@@ -152,7 +152,7 @@ def render_account(session, user: User) -> None:
     with right:
         with st.container(border=True):
             st.markdown("**Recent sign-ins**")
-            st.caption("GoLegal compares every sign-in with your history. New devices, networks or locations trigger an email alert.")
+            st.caption("GoLegal OS compares every sign-in with your history. New devices, networks or locations trigger an email alert.")
             events = auth.recent_security_events(user, limit=8)
             if not events:
                 st.caption("No sign-ins recorded yet.")
@@ -201,6 +201,6 @@ def render_auth_profile(session, user) -> None:
     if user:
         render_account(session, user)
     else:
-        st.markdown("### Sign in to GoLegal")
+        st.markdown("### Sign in to GoLegal OS")
         st.caption("Registration is required to initiate an agreement. Invited signers only need their secure link.")
         render_sign_in(session)

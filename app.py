@@ -11,7 +11,7 @@ from __future__ import annotations
 import streamlit as st
 
 st.set_page_config(
-    page_title="GoLegal · Digital contracting & e-Stamping",
+    page_title="GoLegal OS · The agentic operating system for legal work.",
     page_icon="⚖️",
     layout="wide",
     initial_sidebar_state="expanded",
@@ -42,7 +42,7 @@ def _top_bar(session, user) -> str:
     inject_theme()
     bar = st.columns([1.7, 4.6, 1.3], vertical_alignment="center")
     with bar[0]:
-        c.brand("India")
+        c.brand("The agentic operating system for legal work.")
     with bar[2]:
         if user:
             st.markdown(f"<div style='text-align:right;font-size:.85rem;color:#475569;padding-top:.45rem'>"

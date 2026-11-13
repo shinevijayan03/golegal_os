@@ -70,7 +70,7 @@ class NotificationService:
         signing_url = self.generate_signing_url(agreement_id, party_id, party_role)
         message_body = (
             f"Hello {party_name}, you have been invited to review and e-sign {agreement_title} "
-            f"as {party_role} on GoLegal. Click here to sign securely: {signing_url}"
+            f"as {party_role} on GoLegal OS. Click here to sign securely: {signing_url}"
         )
         payload = {
             "agreement_id": agreement_id,
@@ -105,7 +105,7 @@ class NotificationService:
         return self._record(payload, "COMPLETION", triggered_by)
 
     def dispatch_security_alert(self, user_email: str, reasons: List[str], ip: str) -> Dict[str, Any]:
-        body = (f"Security alert: a sign-in to your GoLegal account was detected from {ip}. "
+        body = (f"Security alert: a sign-in to your GoLegal OS account was detected from {ip}. "
                 f"Reasons: {'; '.join(reasons)}. If this was not you, reset your password immediately.")
         payload = {"agreement_id": None, "email": user_email, "channel": "EMAIL", "message": body, "status": "SENT"}
         self.dispatched_messages.append(payload)

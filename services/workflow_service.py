@@ -222,7 +222,7 @@ class WorkflowService:
         if existing and agreement.final_pdf_sha256 == existing.sha256:
             return existing.content
         pdf = self.build_pdf(agreement, is_draft=False)
-        doc = self.documents.store(agreement.id, "FINAL", f"GoLegal_Sealed_{agreement.id[:8]}.pdf", pdf)
+        doc = self.documents.store(agreement.id, "FINAL", f"GoLegal_OS_Sealed_{agreement.id[:8]}.pdf", pdf)
         agreement.final_pdf_url = f"/documents/{doc.id}"
         agreement.final_pdf_sha256 = doc.sha256
         for party in agreement.parties:
@@ -230,7 +230,7 @@ class WorkflowService:
                                                           actions_for_role(party.party_type, signed=True),
                                                           ttl_seconds=settings.agreement_retain_days * 86400)
             self.notifier.dispatch_completion_notice(agreement.id, party, download_allowed=party.party_type != "Witness")
-        self._audit(agreement.id, "DOCUMENT_SEALED", "GOLEGAL_CORPORATE_DSC",
+        self._audit(agreement.id, "DOCUMENT_SEALED", "GOLEGAL_OS_CORPORATE_DSC",
                     {"final_sha256": doc.sha256, "size_bytes": doc.size_bytes, "server_host": socket.gethostname()})
         self.session.commit()
         return pdf
