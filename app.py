@@ -22,6 +22,7 @@ from golegal.agentos.ui.views.studio_view import render_studio_view
 from golegal.agentos.ui.views.mission_view import render_mission_view
 from golegal.agentos.ui.views.approvals_view import render_approvals_view
 from golegal.agentos.ui.views.evidence_view import render_evidence_view
+from golegal.agentos.ui.views.rag_lab_view import render_rag_lab_view
 from golegal.agentos.ui.views.report_view import render_report_view
 
 # GoLegal Platform Bridge Views
@@ -49,6 +50,7 @@ NAV_MODULES = [
     "🚀 Mission Console",
     "📥 Approvals Inbox",
     "🛡️ Evidence Explorer",
+    "⚡ 10-Stage Hybrid RAG Lab",
     "📊 Report Center",
     "📜 Contract Platform Bridge"
 ]
@@ -64,7 +66,7 @@ def main() -> None:
         actor_context = render_agentos_top_bar()
 
         # 2. Main Navigation Tabs
-        tab_studio, tab_mission, tab_approvals, tab_evidence, tab_report, tab_bridge = st.tabs(NAV_MODULES)
+        tab_studio, tab_mission, tab_approvals, tab_evidence, tab_rag, tab_report, tab_bridge = st.tabs(NAV_MODULES)
 
         with tab_studio:
             render_studio_view(session, actor_context)
@@ -77,6 +79,9 @@ def main() -> None:
 
         with tab_evidence:
             render_evidence_view(session, actor_context)
+
+        with tab_rag:
+            render_rag_lab_view(session, actor_context)
 
         with tab_report:
             render_report_view(session, actor_context)
