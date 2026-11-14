@@ -17,6 +17,8 @@ htmlcov/
 
 # Local databases & artifacts
 *.db
+*.db-shm
+*.db-wal
 *.sqlite
 *.sqlite3
 artifacts/

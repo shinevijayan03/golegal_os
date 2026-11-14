@@ -1,127 +1,127 @@
 """
-GoLegal - Digital contracting, e-Stamping and multi-party Aadhaar eSign.
-
-Entry point and router. Two entry paths:
-  1. The product itself (landing, wizard, workspace, Copilot, admin).
-  2. A capability link (?sign_token=...) which opens the counterparty signing
-     page with no account required - the token is the credential.
+GoLegal AgentOS v1.0 — Pure Python 3.12+ & Streamlit Modular Monolith.
+Supervised Legal Contract Operations, Durable Agent Runtime & Local GPU Acceleration.
+Executive Crimson Red (#D32F2F) & Vibrant Orange (#FF5722) Light Design System (WCAG 2.2 AA).
 """
 from __future__ import annotations
-
 import streamlit as st
 
 st.set_page_config(
-    page_title="GoLegal OS · The agentic operating system for legal work.",
+    page_title="GoLegal AgentOS v1.0 · Supervised Legal Contract Operations",
     page_icon="⚖️",
     layout="wide",
     initial_sidebar_state="expanded",
 )
 
-from ai.llm import get_llm_client  # noqa: E402
-from config import settings  # noqa: E402
-from persistence.database import SessionLocal, init_db  # noqa: E402
-from ui import components as c  # noqa: E402
-from ui.admin import render_admin  # noqa: E402
-from ui.auth_profile import render_auth_profile  # noqa: E402
-from ui.copilot import render_copilot_page, render_copilot_sidebar  # noqa: E402
-from ui.dashboard import render_dashboard  # noqa: E402
-from ui.landing import render_landing_page  # noqa: E402
-from ui.sign import render_signing_page  # noqa: E402
-from ui.state import ADMIN_ITEM, NAV_ITEMS, current_user, sign_out, wizard_state  # noqa: E402
-from ui.theme import inject_theme  # noqa: E402
-from ui.wizard import render_wizard  # noqa: E402
+from golegal.db.session import init_db, SessionLocal
+from golegal.db.seed import seed_demo_tenants_and_templates
+from golegal.ui.theme import inject_theme
+from golegal.ui import components as c
+from golegal.agentos.ui.views.top_bar import render_agentos_top_bar
+from golegal.agentos.ui.views.studio_view import render_studio_view
+from golegal.agentos.ui.views.mission_view import render_mission_view
+from golegal.agentos.ui.views.approvals_view import render_approvals_view
+from golegal.agentos.ui.views.evidence_view import render_evidence_view
+from golegal.agentos.ui.views.report_view import render_report_view
+
+# GoLegal Platform Bridge Views
+from golegal.ui.views.catalog_view import render_catalog_view
+from golegal.ui.views.wizard_view import render_wizard_view
+from golegal.ui.views.review_view import render_review_view
+from golegal.ui.views.execution_view import render_execution_view
+from golegal.ui.views.camera_lab_view import render_camera_lab_view
+from golegal.ui.views.audit_vault_view import render_audit_vault_view
 
 
 @st.cache_resource
-def _bootstrap() -> bool:
+def _bootstrap_database() -> bool:
     init_db()
+    session = SessionLocal()
+    try:
+        seed_demo_tenants_and_templates(session)
+    finally:
+        session.close()
     return True
 
 
-def _top_bar(session, user) -> str:
-    inject_theme()
-    bar = st.columns([1.7, 4.6, 1.3], vertical_alignment="center")
-    with bar[0]:
-        c.brand("The agentic operating system for legal work.")
-    with bar[2]:
-        if user:
-            st.markdown(f"<div style='text-align:right;font-size:.85rem;color:#475569;padding-top:.45rem'>"
-                        f"<b>{c.esc(user.full_name)}</b><br/><span style='font-size:.78rem'>"
-                        f"{'Platform admin' if user.is_admin else c.esc(user.email)}</span></div>", unsafe_allow_html=True)
-        else:
-            st.markdown("<div style='text-align:right;font-size:.85rem;color:#64748B;padding-top:.6rem'>Not signed in</div>",
-                        unsafe_allow_html=True)
-
-    items = list(NAV_ITEMS) + ([ADMIN_ITEM] if user and user.is_admin else [])
-    active = st.session_state.get("active_tab", "Home")
-    if active not in items:
-        active = "Home"
-    with bar[1]:
-        chosen = st.segmented_control("Navigation", items, default=active, key="nav_control", label_visibility="collapsed")
-    chosen = chosen or active
-    if chosen != st.session_state.get("active_tab"):
-        st.session_state["active_tab"] = chosen
-        st.rerun()
-    return chosen
-
-
-def _sidebar(session, user) -> None:
-    render_copilot_sidebar(session, user)
-    with st.sidebar:
-        st.divider()
-        wiz = wizard_state()
-        if wiz.get("agreement_id"):
-            st.caption(f"Active draft · {wiz['agreement_id'][:8]} · step {wiz['step']} of 5")
-        llm = get_llm_client()
-        st.caption(f"AI: {'Claude ' + llm.model if llm.available else 'built-in rules'}")
-        st.caption(f"Gateways: {'sandbox' if settings.mock_gateways else 'live'} · {settings.environment}")
-        if user and st.button("Sign out", use_container_width=True, key="side_signout"):
-            sign_out()
-            st.rerun()
+NAV_MODULES = [
+    "🤖 Agent Studio",
+    "🚀 Mission Console",
+    "📥 Approvals Inbox",
+    "🛡️ Evidence Explorer",
+    "📊 Report Center",
+    "📜 Contract Platform Bridge"
+]
 
 
 def main() -> None:
-    _bootstrap()
+    _bootstrap_database()
+    inject_theme()
+
     session = SessionLocal()
     try:
-        params = st.query_params
-        token = params.get("sign_token") or st.session_state.get("sign_token")
-        agr_id = params.get("agr_id") or st.session_state.get("sign_agr_id")
-        pty_id = params.get("party_id") or st.session_state.get("sign_party_id")
+        # 1. Executive Top Bar with Multi-Tenant & AgentOS Role Switcher + GPU Telemetry
+        actor_context = render_agentos_top_bar()
 
-        if token and agr_id and pty_id:
-            # Capability-link entry: keep it across reruns, skip the product chrome.
-            st.session_state.update({"sign_token": token, "sign_agr_id": agr_id, "sign_party_id": pty_id})
-            inject_theme()
-            render_signing_page(session, token, agr_id, pty_id)
-            return
+        # 2. Main Navigation Tabs
+        tab_studio, tab_mission, tab_approvals, tab_evidence, tab_report, tab_bridge = st.tabs(NAV_MODULES)
 
-        user = current_user(session)
-        active = _top_bar(session, user)
-        _sidebar(session, user)
+        with tab_studio:
+            render_studio_view(session, actor_context)
 
-        if active == "Home":
-            render_landing_page(user)
-        elif active == "Create agreement":
-            render_wizard(session, user)
-        elif active == "My agreements":
-            render_dashboard(session, user)
-        elif active == "Copilot":
-            render_copilot_page(session, user)
-        elif active == "Account":
-            render_auth_profile(session, user)
-        elif active == ADMIN_ITEM:
-            render_admin(session, user)
+        with tab_mission:
+            render_mission_view(session, actor_context)
 
+        with tab_approvals:
+            render_approvals_view(session, actor_context)
+
+        with tab_evidence:
+            render_evidence_view(session, actor_context)
+
+        with tab_report:
+            render_report_view(session, actor_context)
+
+        with tab_bridge:
+            st.markdown("### 📜 GoLegal Contract Platform Bridge (System of Record)")
+            c.notice(
+                "<b>SYSTEM-OF-RECORD BOUNDARY:</b> AgentOS creates proposed findings and review tasks, "
+                "bridged via <code>ContractGateway</code>. Official contracts, e-Stamping, and mock eSign records "
+                "remain strictly governed by the underlying Contract Platform.",
+                tone="warn"
+            )
+            b_cat, b_wiz, b_rev, b_exec, b_cam, b_aud = st.tabs([
+                "Legal Catalog", "Guided Contract Wizard", "Review & Diff", "Stamping & eSign", "GPU Camera Lab", "Audit & BSA §63 Vault"
+            ])
+            with b_cat:
+                render_catalog_view(session, actor_context)
+            with b_wiz:
+                render_wizard_view(session, actor_context)
+            with b_rev:
+                render_review_view(session, actor_context)
+            with b_exec:
+                render_execution_view(session, actor_context)
+            with b_cam:
+                render_camera_lab_view(session, actor_context)
+            with b_aud:
+                render_audit_vault_view(session, actor_context)
+
+        # 3. Enterprise Footer
         st.write("")
-        st.markdown(
-            "<div style='border-top:1px solid #E2E8F0;padding-top:.8rem;color:#94A3B8;font-size:.8rem'>"
-            "GoLegal by AAS Innovation Labs · Executed under the Information Technology Act 2000 (§§ 4, 5, 10A) with a "
-            "Section 65B certificate under the Indian Evidence Act 1872 · e-Stamp duty remitted through Stock Holding "
-            "Corporation of India Ltd · Aadhaar numbers are never stored in full."
-            "</div>", unsafe_allow_html=True)
+        from golegal.ui.components import render_html
+        render_html("""
+        <div style="border-top: 1px solid #E5E7EB; margin-top: 2rem; padding-top: 1rem; color: #6B7280; font-size: 0.8rem; display: flex; justify-content: space-between; align-items: center;">
+          <div>
+            <b style="color: #111827;">GoLegal AgentOS v1.0</b> &middot; Supervised Legal Contract Operations &middot; Section 65B &amp; BSA 2023 &sect;63 Evidence Architecture.
+          </div>
+          <div style="color: #C2410C; font-weight: 600;">
+            NVIDIA RTX 3060 12GB &middot; CUDA 13.3 Local RAG Acceleration &middot; Offline Simulation Mode
+          </div>
+        </div>
+        """)
+
     finally:
         session.close()
 
 
-main()
+if __name__ == "__main__":
+    main()
