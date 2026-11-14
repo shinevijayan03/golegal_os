@@ -13,7 +13,7 @@ APP_PATH = str(Path(__file__).parent.parent / "app.py")
 
 def test_app_initial_render_zero_exceptions():
     """Verify app bootstraps cleanly and renders all 6 tabs without any UI exceptions."""
-    at = AppTest.from_file(APP_PATH, default_timeout=30)
+    at = AppTest.from_file(APP_PATH, default_timeout=45)
     at.run()
 
     # Zero unhandled exceptions

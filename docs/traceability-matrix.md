@@ -15,6 +15,7 @@
   - `tests/test_ui_apptest.py` (7 tests)
   - `tests/test_e2e_multi_actor_lifecycle.py` (7 tests)
   - `tests/test_agentos_at01_to_at26.py` (26 tests)
+  - `tests/test_hybrid_rag_accuracy.py` (5 tests)
 
 ---
 
@@ -26,9 +27,9 @@ $$\text{PRD Requirements} \longleftrightarrow \text{User Stories} \longleftright
 ### Traceability Audit Statistics
 - **Total Ingested Requirements:** 41 (23 Baseline: 15 Functional `FR-01`..`FR-15`, 8 Non-Functional `NFR-01`..`NFR-08`; 18 AgentOS: `AOS-01`..`AOS-18`)
 - **Total User Stories:** 41 (`US-001`..`US-023`, `US-AOS-01`..`US-AOS-18`) across 7 actor personas
-- **Total Design Modules:** 41 (`DES-001`..`DES-023`, `DES-AOS-01`..`DES-AOS-18`) covering 25 Domain Entities, 13 Lifecycle States, and GPU Architecture
-- **Total Implementation Tasks:** 41 (`TASK-001`..`TASK-023`, `TASK-AOS-01`..`TASK-AOS-18`) covering 32 Python production modules
-- **Total Automated Test Mappings:** **189 passing automated tests** across 6 test suites
+- **Total Design Modules:** 41 (`DES-001`..`DES-023`, `DES-AOS-01`..`DES-AOS-18`) covering 25 Domain Entities, 13 Lifecycle States, GPU Architecture, and 10-Stage Hybrid RAG
+- **Total Implementation Tasks:** 41 (`TASK-001`..`TASK-023`, `TASK-AOS-01`..`TASK-AOS-18`) covering 33 Python production modules
+- **Total Automated Test Mappings:** **194 passing automated tests** across 7 test suites
 - **Orphan Requirements Detected:** **0 (0.0%)**
 - **Orphan Implementation Code Detected:** **0 (0.0%)**
 - **Traceability Integrity Score:** **100.0% (Verified)**
@@ -225,7 +226,7 @@ Requirements ingested directly from canonical specification `GoLegal_AgentOS_v1_
 | **DES-AOS-13** | **TASK-AOS-13** | `golegal/agentos/services/budget_manager.py` | Reserves cost estimates in INR paise before tool dispatch and terminates with `BUDGET_EXCEEDED` on exhaustion |
 | **DES-AOS-14** | **TASK-AOS-14** | `golegal/ui/agentos/*.py` | Renders small-screen-aware Streamlit views for Studio, Mission Console, Approval Inbox, Evidence Explorer, and Reports |
 | **DES-AOS-15** | **TASK-AOS-15** | `golegal/agentos/services/evidence_service.py` | Builds append-only cryptographically chained event logs ($H_n = \text{SHA256}(H_{n-1} \parallel \dots)$) |
-| **DES-AOS-16** | **TASK-AOS-16** | `golegal/agentos/intelligence/local_rag.py` | Leverages PyTorch CUDA on RTX 3060 GPU for sub-millisecond dense tensor similarity search |
+| **DES-AOS-16** | **TASK-AOS-16** | `golegal/agentos/intelligence/hybrid_rag.py`, `local_rag.py` | 10-Stage LangChain Hybrid RAG Pipeline (FAISS dense vector store, BM25 sparse keyword search, RRF rank fusion, and Cross-Encoder neural reranker on RTX 3060 CUDA) |
 | **DES-AOS-17** | **TASK-AOS-17** | `golegal/agentos/integrations/contract_gateway.py` | Subscribes to contract revision events and triggers bounded child analysis on eligible document changes |
 | **DES-AOS-18** | **TASK-AOS-18** | `tests/test_agentos_at01_to_at26.py` | Comprehensive acceptance test suite covering all 26 PRD acceptance criteria under automated CI execution |
 
@@ -233,7 +234,7 @@ Requirements ingested directly from canonical specification `GoLegal_AgentOS_v1_
 
 ## 9. Phase 5: Forward Traceability (AgentOS Implementation $\to$ Acceptance Tests)
 
-Every PRD acceptance criterion (`AT-01` through `AT-26`) has a dedicated automated verification test in `tests/test_agentos_at01_to_at26.py`:
+Every PRD acceptance criterion (`AT-01` through `AT-26`) plus dedicated Hybrid RAG accuracy criteria has an automated verification test in `tests/test_agentos_at01_to_at26.py` and `tests/test_hybrid_rag_accuracy.py`:
 
 | PRD Acceptance Criterion | Code Module Tested | Automated Test Case Function | Verification Status |
 | :--- | :--- | :--- | :---: |
@@ -263,6 +264,11 @@ Every PRD acceptance criterion (`AT-01` through `AT-26`) has a dedicated automat
 | **AT-24: 1-Byte Tamper Detection** | `evidence_service.py` | `test_at24_cryptographic_artifact_1byte_tamper_detection`| **PASS (100%)** |
 | **AT-25: Concurrent Tenant Isolation**| `engine.py`, `budget_manager.py` | `test_at25_concurrent_mission_isolation` | **PASS (100%)** |
 | **AT-26: Local GPU RAG Efficiency** | `local_rag.py` | `test_at26_local_gpu_rag_efficiency` | **PASS (100%)** |
+| **AT-RAG-01: Chunker Structure & Spans** | `hybrid_rag.py` | `test_legal_chunker_structure_and_spans` | **PASS (100%)** |
+| **AT-RAG-02: SentenceTransformers Embedding** | `hybrid_rag.py` | `test_local_sentence_transformers_embeddings` | **PASS (100%)** |
+| **AT-RAG-03: Cross-Encoder Discrimination** | `hybrid_rag.py` | `test_cross_encoder_reranker_discrimination` | **PASS (100%)** |
+| **AT-RAG-04: Hybrid Tenant Isolation** | `hybrid_rag.py` | `test_hybrid_rag_search_clauses_tenant_isolation` | **PASS (100%)** |
+| **AT-RAG-05: Dense GPU Search Latency** | `hybrid_rag.py` | `test_dense_clause_similarity_search_latency` | **PASS (100%)** |
 
 ---
 
@@ -319,7 +325,7 @@ Every single verification test case, code module, and deliverable artifact maps 
 | **AOS-13** | `US-AOS-13` | `DES-AOS-13` | `budget_manager.py` | `test_at15_hard_budget_cap_enforcement` | Hard Budget Ledger | **100% TRACED** |
 | **AOS-14** | `US-AOS-14` | `DES-AOS-14` | `ui/agentos/*.py` | `test_at21_side_by_side_finding_review` | Streamlit Agent Console | **100% TRACED** |
 | **AOS-15** | `US-AOS-15` | `DES-AOS-15` | `evidence_service.py` | `test_at24_cryptographic_artifact_1byte_tamper_detection`| Hash Chain ($H_n$) Audit | **100% TRACED** |
-| **AOS-16** | `US-AOS-16` | `DES-AOS-16` | `local_rag.py` | `test_at26_local_gpu_rag_efficiency` | PyTorch RTX 3060 CUDA RAG | **100% TRACED** |
+| **AOS-16** | `US-AOS-16` | `DES-AOS-16` | `hybrid_rag.py`, `local_rag.py` | `test_at26_local_gpu_rag_efficiency`, `test_hybrid_rag_accuracy.py` | 10-Stage LangChain Hybrid RAG + Cross-Encoder | **100% TRACED** |
 | **AOS-17** | `US-AOS-17` | `DES-AOS-17` | `contract_gateway.py` | `test_at19_golegal_integration_native_field_bypass` | Contract Event Watcher | **100% TRACED** |
 | **AOS-18** | `US-AOS-18` | `DES-AOS-18` | `test_agentos_at01_to_at26.py` | `test_at23_deterministic_offline_brain` | Synthetic Eval Harness | **100% TRACED** |
 
@@ -329,8 +335,8 @@ Every single verification test case, code module, and deliverable artifact maps 
 
 - **Audit Standards:** IEEE 828-2012 / ISO/IEC 12207 Software Lifecycle Processes
 - **Total Requirements Traced:** **41 / 41 (100.0%)**
-- **Total Test Cases Executed:** **189**
-- **Total Test Cases Passed:** **189 (100.0%)**
+- **Total Test Cases Executed:** **194**
+- **Total Test Cases Passed:** **194 (100.0%)**
 - **Total Test Cases Failed:** **0 (0.0%)**
 - **Orphan Requirements / Work Items:** **0**
 - **Hardware Acceleration Profile:** Local NVIDIA GeForce RTX 3060 12GB VRAM (CUDA 13.3)
